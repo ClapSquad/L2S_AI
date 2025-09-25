@@ -24,18 +24,18 @@ def convert_video_to_audio(video_path, output_folder='.'):
 
 
 def convert_multiple_videos_into_audios(input_folder, output_folder):
-    # Folders
+    # Create folder if does not exist
     os.makedirs(output_folder, exist_ok=True)
-
-    # Supported video extensions
     video_extensions = (".mp4", ".mkv", ".avi", ".mov", ".flv")
+    video_files = get_files_with_extension(input_folder, video_extensions)
 
-    # Find all video files
-    video_files = [f for f in os.listdir(input_folder) if f.lower().endswith(video_extensions)]
-    print(os.listdir(input_folder))
     if not video_files:
         print("No video files found in the folder. Please add videos to convert.")
     else:
         for filename in video_files:
             video_path = os.path.join(input_folder, filename)
             convert_video_to_audio(video_path, output_folder)
+
+
+def get_files_with_extension(path, extensions):
+    return [f for f in os.listdir(path) if f.lower().endswith(extensions)]
