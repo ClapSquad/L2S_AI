@@ -1,13 +1,13 @@
-import os
-import subprocess
+import os, logging, subprocess
 
 
 def convert_video_to_audio(video_path, output_folder='.'):
     filename = os.path.basename(video_path)
     audio_filename = os.path.splitext(filename)[0] + ".mp3"
     audio_path = os.path.join(output_folder, audio_filename)
+    os.makedirs(output_folder, exist_ok=True)
 
-    print(f"Converting {filename} → {audio_filename} ...")
+    logging.debug(f"Converting {filename} → {audio_filename} ...")
 
     # Run FFmpeg
     try:
@@ -18,9 +18,10 @@ def convert_video_to_audio(video_path, output_folder='.'):
             "-map", "a",
             audio_path
         ], check=True)
-        print("Done^^")
+        logging.debug("Audio conversion done.")
+        return audio_filename
     except subprocess.CalledProcessError:
-        print(f"Failed to convert {filename}")
+        logging.error(f"Failed to convert {filename}")
 
 
 def convert_multiple_videos_into_audios(input_folder, output_folder):
@@ -30,7 +31,7 @@ def convert_multiple_videos_into_audios(input_folder, output_folder):
     video_files = get_files_with_extension(input_folder, video_extensions)
 
     if not video_files:
-        print("No video files found in the folder. Please add videos to convert.")
+        logging.warning("No video files found in the folder. Please add videos to convert.")
     else:
         for filename in video_files:
             video_path = os.path.join(input_folder, filename)
