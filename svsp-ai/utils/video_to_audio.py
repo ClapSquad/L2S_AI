@@ -1,36 +1,42 @@
-import os
-import subprocess
+import os, logging, subprocess
 
-# Folders
-input_folder = "."  # current folder
-output_folder = os.path.join(".", "audio")
-os.makedirs(output_folder, exist_ok=True)
 
-# Supported video extensions
-video_extensions = (".mp4", ".mkv", ".avi", ".mov", ".flv")
+def convert_video_to_audio(video_path, output_folder='.'):
+    filename = os.path.basename(video_path)
+    audio_filename = os.path.splitext(filename)[0] + ".mp3"
+    audio_path = os.path.join(output_folder, audio_filename)
+    os.makedirs(output_folder, exist_ok=True)
 
-# Find all video files
-video_files = [f for f in os.listdir(input_folder) if f.lower().endswith(video_extensions)]
+    logging.debug(f"Converting {filename} → {audio_filename} ...")
 
-if not video_files:
-    print("No video files found in the folder. Please add videos to convert.")
-else:
-    for filename in video_files:
-        video_path = os.path.join(input_folder, filename)
-        audio_filename = os.path.splitext(filename)[0] + ".mp3"
-        audio_path = os.path.join(output_folder, audio_filename)
+    # Run FFmpeg
+    try:
+        subprocess.run([
+            "ffmpeg",
+            "-i", video_path,
+            "-q:a", "0",
+            "-map", "a",
+            audio_path
+        ], check=True)
+        logging.debug("Audio conversion done.")
+        return audio_filename
+    except subprocess.CalledProcessError:
+        logging.error(f"Failed to convert {filename}")
 
-        print(f"Converting {filename} → {audio_filename} ...")
 
-        # Run FFmpeg
-        try:
-            subprocess.run([
-                "ffmpeg",
-                "-i", video_path,
-                "-q:a", "0",
-                "-map", "a",
-                audio_path
-            ], check=True)
-            print("Done^^")
-        except subprocess.CalledProcessError:
-            print(f"Failed to convert {filename}. Skipping.")
+def convert_multiple_videos_into_audios(input_folder, output_folder):
+    # Create folder if does not exist
+    os.makedirs(output_folder, exist_ok=True)
+    video_extensions = (".mp4", ".mkv", ".avi", ".mov", ".flv")
+    video_files = get_files_with_extension(input_folder, video_extensions)
+
+    if not video_files:
+        logging.warning("No video files found in the folder. Please add videos to convert.")
+    else:
+        for filename in video_files:
+            video_path = os.path.join(input_folder, filename)
+            convert_video_to_audio(video_path, output_folder)
+
+
+def get_files_with_extension(path, extensions):
+    return [f for f in os.listdir(path) if f.lower().endswith(extensions)]

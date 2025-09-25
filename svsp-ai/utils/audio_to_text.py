@@ -7,7 +7,7 @@
 
 import whisper
 import argparse
-import os
+import logging, os
 
 def transcribe_audio(audio_path: str, model_name: str = "base") -> str:
     """
@@ -31,15 +31,15 @@ def transcribe_audio(audio_path: str, model_name: str = "base") -> str:
         # Model options: "tiny", "base", "small", "medium", "large"
         # 일단 choosing base because it has a good balance of speed and accuracy.
 
-        print(f"Loading model ('{model_name}')...")
+        logging.debug(f"Loading model ('{model_name}')...")
         model = whisper.load_model(model_name)
-        print("Model loaded successfully.")
+        logging.debug("Model loaded successfully.")
 
-        print(f"Starting transcription for '{audio_path}'...")
+        logging.debug(f"Starting transcription for '{audio_path}'...")
         result = model.transcribe(audio_path)
         language = result["language"]   
-        print(f"Detected language: {language}")
-        print("Transcription complete.")
+        logging.debug(f"Detected language: {language}")
+        logging.debug("Transcription complete.")
 
         transcribed_text = result["text"]
         return transcribed_text
