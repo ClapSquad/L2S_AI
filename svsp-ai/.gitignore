@@ -1,2 +1,9 @@
 # Sample videos
 examples/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Ignore all __pycache__ folders recursively
+**/__pycache__/
