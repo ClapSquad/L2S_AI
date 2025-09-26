@@ -22,6 +22,7 @@ import os
 import sys
 import json
 import argparse
+import time
 
 import requests
 
@@ -41,36 +42,56 @@ except ImportError:
     GOOGLE_AUTH_AVAILABLE = False
 
 # OpenAI ChatGPT 호출
-def call_openai(api_key, model, prompt):
+def call_openai(api_key, model, prompt, max_retries=5, initial_delay=1):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {"model": model, "messages": [{"role": "user", "content": prompt}]}
-    resp = requests.post(url, headers=headers, json=data)
-    resp.raise_for_status()
-    result = resp.json()
-    text = ''.join(choice['message'].get('content','') for choice in result.get('choices',[]))
-    return {"raw": result, "text": text}
+
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(url, headers=headers, json=data)
+            resp.raise_for_status()
+            result = resp.json()
+            text = ''.join(choice['message'].get('content','') for choice in result.get('choices',[]))
+            return {"raw": result, "text": text}
+        except requests.exceptions.HTTPError as e:
+            # 429 is the status code for "Too Many Requests" (rate limiting)
+            if e.response.status_code == 429 and attempt < max_retries - 1:
+                delay = initial_delay * (2 ** attempt)
+                print(f"Rate limit exceeded. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})", file=sys.stderr)
+                time.sleep(delay)
+            else:
+                raise # Re-raise the last exception if all retries fail or it's not a 429 error
 
 # Gemini(Vertex AI) 호출
-def call_gemini(project, location, model, prompt, credentials_path=None):
+def call_gemini(project, location, model, prompt, credentials_path=None, max_retries=5, initial_delay=1):
     if not GOOGLE_AUTH_AVAILABLE:
         raise RuntimeError("google-auth 라이브러리 설치 필요")
 
     model_path = f"projects/{project}/locations/{location}/models/{model}"
     endpoint = f"https://{location}-aiplatform.googleapis.com/v1/{model_path}:predict"
-    audience = f"https://{location}-aiplatform.googleapis.com/"
 
     creds_path = credentials_path or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-    creds = service_account.IDTokenCredentials.from_service_account_file(creds_path, target_audience=audience)
+    creds = service_account.Credentials.from_service_account_file(creds_path, scopes=['https://www.googleapis.com/auth/cloud-platform'])
     creds.refresh(Request())
 
     headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"}
     payload = {"instances": [{"content": prompt}], "parameters": {"temperature":0.0, "maxOutputTokens":1024}}
-    resp = requests.post(endpoint, headers=headers, json=payload)
-    resp.raise_for_status()
-    data = resp.json()
-    text = data.get('predictions',[{}])[0].get('content','')
-    return {"raw": data, "text": text}
+
+    for attempt in range(max_retries):
+        try:
+            resp = requests.post(endpoint, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            text = data.get('predictions',[{}])[0].get('content','')
+            return {"raw": data, "text": text}
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429 and attempt < max_retries - 1:
+                delay = initial_delay * (2 ** attempt)
+                print(f"Rate limit exceeded. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})", file=sys.stderr)
+                time.sleep(delay)
+            else:
+                raise
 
 # 메인 함수
 def main():
@@ -90,7 +111,7 @@ def main():
             api_key = os.environ.get('OPENAI_API_KEY')
             if not api_key:
                 raise RuntimeError('OPENAI_API_KEY 환경변수 필요')
-            out = call_openai(api_key, args.model, args.prompt)
+            out = call_openai(api_key=api_key, model=args.model, prompt=args.prompt)
         elif args.provider == 'gemini':
             if not args.project:
                 raise RuntimeError('--project 필요')
