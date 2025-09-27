@@ -8,19 +8,20 @@
 import whisper
 import argparse
 import logging, os
+from typing import List, Tuple
 
 def transcribe_audio(audio_path: str, model_name: str = "base") -> str:
     """
-    Transcribes an audio file to text using OpenAI's Whisper.
+    Transcribes an audio file and returns a list of (text, (start, end)) tuples
+    taken from Whisper's per-segment timestamps (seconds).
 
     Args:
-        audio_path: The path to the audio file (e.g., .mp3, .wav, .m4a).
-        model_name: The name of the Whisper model to use 
-                    (e.g., "tiny", "base", "small", "medium", "large").
-                    It defaults to base.
+        audio_path: Path to the audio file (.mp3, .wav, .m4a, etc.)
+        model_name: Whisper model name ("tiny", "base", "small", "medium", "large")
 
     Returns:
-        The transcribed text as a string, or an error message if transcription fails.
+        List of tuples: [(segment_text, (start_sec, end_sec)), ...]
+        If file is missing or an error occurs, returns an empty list.
     """
     if not os.path.exists(audio_path):
         return f"Error: Audio file not found at '{audio_path}'."
@@ -38,11 +39,20 @@ def transcribe_audio(audio_path: str, model_name: str = "base") -> str:
         logging.debug(f"Starting transcription for '{audio_path}'...")
         result = model.transcribe(audio_path)
         language = result["language"]   
-        logging.debug(f"Detected language: {language}")
+        logging.debug(f"Detected language: {result.get('language')}")
         logging.debug("Transcription complete.")
 
-        transcribed_text = result["text"]
-        return transcribed_text
+        # transcribed_text = result["text"]
+        # return transcribed_text
+
+        # the segments key contains the segment-level timestamps
+        segments = result.get("segments", [])
+
+        tuples: List[Tuple[str, Tuple[float, float]]] = [
+            (seg.get("text", "").strip(), (float(seg.get("start", 0.0)), float(seg.get("end", 0.0))))
+            for seg in segments
+        ]
+        return tuples
 
     except Exception as e:
         return f"An error occurred during transcription: {e}"
@@ -71,5 +81,6 @@ if __name__ == '__main__':
 
     # Print the result
     print("\n--- Transcription Result ---")
-    print(text)
+    for tuple in text:
+        print(tuple)
     print("--------------------------")
