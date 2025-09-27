@@ -159,17 +159,15 @@ def call_openai(api_key: str, model: str, prompt: str,
     raise RuntimeError(msg)
 
 # Gemini(Vertex AI) 호출
-def call_gemini(project, location, model, prompt, credentials_path=None):
+def call_gemini(model: str, prompt: str):
    
     # This function now uses the google-generativeai library, which uses an API key.
-    # The project, location, and credentials_path arguments are kept for command-line compatibility but are not used.
     if not VERTEXAI_AVAILABLE:
         raise RuntimeError("google-generativeai 라이브러리 설치 필요. `pip install google-generativeai`")
     
     # RECOMMENDED MODELS
-    # gemini-2.5-flash: Fast and good
-    # gemini-2.5-pro: Better
-    # gemini-2.5-flash-lite: Lightest
+    # gemini-1.5-flash: Fast and good
+    # gemini-1.5-pro: Better
 
     api_key = os.environ.get('GOOGLE_API_KEY')
     if not api_key:
@@ -190,9 +188,6 @@ def main():
     parser.add_argument('--provider', choices=['openai','gemini'], required=True)
     parser.add_argument('--model', required=True)
     parser.add_argument('--prompt', required=True)
-    parser.add_argument('--project')
-    parser.add_argument('--location', default='us-central1')
-    parser.add_argument('--credentials-path', help="Path to Google Cloud service account JSON file. Overrides GOOGLE_APPLICATION_CREDENTIALS.")
     args = parser.parse_args()
 
     try:
@@ -202,7 +197,7 @@ def main():
                 raise RuntimeError('OPENAI_API_KEY 환경변수 필요')
             out = call_openai(api_key=api_key, model=args.model, prompt=args.prompt)
         elif args.provider == 'gemini':
-            out = call_gemini(args.project, args.location, args.model, args.prompt, args.credentials_path)
+            out = call_gemini(model=args.model, prompt=args.prompt)
         print(json.dumps(out, ensure_ascii=False, indent=2))
     except RateLimitError as e:
         print(json.dumps({'error': f"OpenAI Rate Limit Exceeded: {e}"}, ensure_ascii=False), file=sys.stderr)
