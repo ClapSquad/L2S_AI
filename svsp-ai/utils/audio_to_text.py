@@ -1,26 +1,26 @@
 # to run this first you need to install whisper (also whisper requires ffmpeg)
-# pip install openai-whisper
-# sudo apt update && sudo apt install ffmpeg
+# pip install faster-whisper
 
 # To use this script
 # python audio_to_text.py example_file.mp3
 
-import whisper
 import argparse
 import logging, os
+from typing import List, Tuple, Union
+from faster_whisper import WhisperModel
 
-def transcribe_audio(audio_path: str, model_name: str = "base") -> str:
+def transcribe_audio(audio_path: str, model_name: str = "base") -> Union[List[Tuple[str, Tuple[float, float]]], str]:
     """
-    Transcribes an audio file to text using OpenAI's Whisper.
+    Transcribes an audio file and returns a list of (text, (start, end)) tuples
+    taken from Whisper's per-segment timestamps (seconds).
 
     Args:
-        audio_path: The path to the audio file (e.g., .mp3, .wav, .m4a).
-        model_name: The name of the Whisper model to use 
-                    (e.g., "tiny", "base", "small", "medium", "large").
-                    It defaults to base.
+        audio_path: Path to the audio file (.mp3, .wav, .m4a, etc.)
+        model_name: Whisper model name ("tiny", "base", "small", "medium", "large")
+                  See https://github.com/guillaumekln/faster-whisper for all available models.
 
     Returns:
-        The transcribed text as a string, or an error message if transcription fails.
+        List of tuples: [(segment_text, (start_sec, end_sec)), ...]
     """
     if not os.path.exists(audio_path):
         return f"Error: Audio file not found at '{audio_path}'."
@@ -29,20 +29,24 @@ def transcribe_audio(audio_path: str, model_name: str = "base") -> str:
         
         # Load a Whisper model. The first time this is run, it will download the model.
         # Model options: "tiny", "base", "small", "medium", "large"
-        # 일단 choosing base because it has a good balance of speed and accuracy.
+        # Using faster-whisper. It's recommended to use "base" for a good balance of speed and accuracy.
 
         logging.debug(f"Loading model ('{model_name}')...")
-        model = whisper.load_model(model_name)
+        # Run on CPU with INT8
+        model = WhisperModel(model_name, device="cpu", compute_type="int8")
         logging.debug("Model loaded successfully.")
 
         logging.debug(f"Starting transcription for '{audio_path}'...")
-        result = model.transcribe(audio_path)
-        language = result["language"]   
-        logging.debug(f"Detected language: {language}")
+        segments, info = model.transcribe(audio_path, beam_size=5)
+        logging.debug(f"Detected language '{info.language}' with probability {info.language_probability}")
         logging.debug("Transcription complete.")
 
-        transcribed_text = result["text"]
-        return transcribed_text
+        # The 'segments' is an iterator of Segment objects.
+        tuples: List[Tuple[str, Tuple[float, float]]] = [
+            (seg.text.strip(), (seg.start, seg.end))
+            for seg in segments
+        ]
+        return tuples
 
     except Exception as e:
         return f"An error occurred during transcription: {e}"
@@ -60,7 +64,7 @@ if __name__ == '__main__':
         "--model", 
         type=str, 
         default="base", 
-        choices=["tiny", "base", "small", "medium", "large"],
+        choices=["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"],
         help="The Whisper model to use for transcription (default: base)."
     )
     
@@ -71,5 +75,9 @@ if __name__ == '__main__':
 
     # Print the result
     print("\n--- Transcription Result ---")
-    print(text)
+    if isinstance(text, list):
+        for segment in text:
+            print(segment)
+    else:
+        print(text) # Print error message
     print("--------------------------")
