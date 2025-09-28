@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent } from "react";
+import React, { useState, type ChangeEvent } from "react";
 import axios from "axios";
 
 const FileUpload: React.FC = () => {
