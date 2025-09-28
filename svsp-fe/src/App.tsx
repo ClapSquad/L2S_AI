@@ -1,9 +1,9 @@
-function App() {
-  return (
-    <>
-      <h1>Semantic Video Summarization Front End</h1>
-    </>
-  );
-}
+import React from "react";
+import FileUpload from "./components/FileUpload";
+
+
+const App: React.FC = () => {
+  return <FileUpload />;
+};
 
 export default App;
