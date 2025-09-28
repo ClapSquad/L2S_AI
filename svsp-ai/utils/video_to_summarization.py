@@ -1,6 +1,6 @@
-from video_to_audio import convert_video_to_audio
-from audio_to_text import transcribe_audio
-from llm_client import call_gemini
+from .video_to_audio import convert_video_to_audio
+from .audio_to_text import transcribe_audio
+from .llm_client import call_gemini
 import logging, shutil, os
 
 
