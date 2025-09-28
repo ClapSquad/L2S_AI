@@ -1,5 +1,7 @@
 {
-  "extends": "./tsconfig.app.json",
-  "compilerOptions": {},
-  "include": []
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }
