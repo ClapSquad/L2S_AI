@@ -24,12 +24,13 @@ import json
 import argparse
 import random
 import time
-
+import logging
 
 try:
     # .env 파일에서 환경 변수를 로드합니다.
     # pip install python-dotenv
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass  # python-dotenv가 설치되지 않은 경우 무시합니다.
@@ -37,6 +38,7 @@ except ImportError:
 try:
     # pip install openai
     from openai import OpenAI, RateLimitError, APIStatusError, APIConnectionError, AuthenticationError, BadRequestError
+
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -45,9 +47,11 @@ try:
     # pip install google-generativeai
     import google.generativeai as genai
     from google.api_core import exceptions as google_exceptions
+
     VERTEXAI_AVAILABLE = True
 except ImportError:
     VERTEXAI_AVAILABLE = False
+
 
 # OpenAI ChatGPT 호출
 def call_openai(api_key: str, model: str, prompt: str,
@@ -75,13 +79,13 @@ def call_openai(api_key: str, model: str, prompt: str,
     for attempt in range(5):
         try:
             kwargs = {
-                "model": model,                 # e.g. "gpt-4o-mini" or "gpt-4o"
+                "model": model,  # e.g. "gpt-4o-mini" or "gpt-4o"
                 "input": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": temperature,
-                "max_output_tokens": 1024,      # adjust for summaries
+                "max_output_tokens": 1024,  # adjust for summaries
                 "timeout": timeout,
             }
             if as_json:
@@ -104,7 +108,8 @@ def call_openai(api_key: str, model: str, prompt: str,
 
         except AuthenticationError as e:
             # Don’t retry bad credentials
-            raise RuntimeError(f"Auth failed (check API key/org): {getattr(e,'status_code',None)} {getattr(getattr(e,'response',None),'text',e)}") from e
+            raise RuntimeError(
+                f"Auth failed (check API key/org): {getattr(e, 'status_code', None)} {getattr(getattr(e, 'response', None), 'text', e)}") from e
 
         except BadRequestError as e:
             # Don’t retry invalid request (e.g., too many tokens)
@@ -158,13 +163,13 @@ def call_openai(api_key: str, model: str, prompt: str,
             msg += f" Last error={repr(last_err)}"
     raise RuntimeError(msg)
 
+
 # Gemini(Vertex AI) 호출
 def call_gemini(model: str, prompt: str):
-   
     # This function now uses the google-generativeai library, which uses an API key.
     if not VERTEXAI_AVAILABLE:
         raise RuntimeError("google-generativeai 라이브러리 설치 필요. `pip install google-generativeai`")
-    
+
     # RECOMMENDED MODELS
     # gemini-1.5-flash: Fast and good
     # gemini-1.5-pro: Better
@@ -172,7 +177,7 @@ def call_gemini(model: str, prompt: str):
     api_key = os.environ.get('GOOGLE_API_KEY')
     if not api_key:
         raise RuntimeError('GOOGLE_API_KEY 환경변수 필요')
-    
+
     genai.configure(api_key=api_key)
     gemini_model = genai.GenerativeModel(model_name=model)
 
@@ -180,12 +185,12 @@ def call_gemini(model: str, prompt: str):
     text = response.text
     return {"raw": str(response), "text": text}
 
+
 # 메인 함수
 def main():
-
     # command line arguments
     parser = argparse.ArgumentParser(description="간단한 LLM 클라이언트")
-    parser.add_argument('--provider', choices=['openai','gemini'], required=True)
+    parser.add_argument('--provider', choices=['openai', 'gemini'], required=True)
     parser.add_argument('--model', required=True)
     parser.add_argument('--prompt', required=True)
     args = parser.parse_args()
@@ -198,16 +203,19 @@ def main():
             out = call_openai(api_key=api_key, model=args.model, prompt=args.prompt)
         elif args.provider == 'gemini':
             out = call_gemini(model=args.model, prompt=args.prompt)
-        print(json.dumps(out, ensure_ascii=False, indent=2))
+        logging.debug(json.dumps(out, ensure_ascii=False, indent=2))
     except RateLimitError as e:
-        print(json.dumps({'error': f"OpenAI Rate Limit Exceeded: {e}"}, ensure_ascii=False), file=sys.stderr)
+        logging.debug(json.dumps({'error': f"OpenAI Rate Limit Exceeded: {e}"}, ensure_ascii=False), file=sys.stderr)
         sys.exit(1)
     except google_exceptions.ResourceExhausted as e:
-        print(json.dumps({'error': f"Google Cloud Quota Exceeded: {e}"}, ensure_ascii=False), file=sys.stderr)
+        logging.debug(json.dumps({'error': f"Google Cloud Quota Exceeded: {e}"}, ensure_ascii=False), file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(json.dumps({'error': f"An unexpected error occurred: {type(e).__name__}: {e}"}, ensure_ascii=False), file=sys.stderr)
+        logging.debug(
+            json.dumps({'error': f"An unexpected error occurred: {type(e).__name__}: {e}"}, ensure_ascii=False),
+            file=sys.stderr)
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

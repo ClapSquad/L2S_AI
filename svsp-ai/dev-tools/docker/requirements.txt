@@ -1,3 +1,6 @@
 requests
-openai-whisper
+faster_whisper
 ffmpeg-python
+python-dotenv
+openai
+google-generativeai
