@@ -5,7 +5,9 @@ const FileUpload: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
 
   // ✅ 업로드 상태와 메시지 추가
-  const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "uploading" | "success" | "error"
+  >("idle");
   const [message, setMessage] = useState("");
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -31,7 +33,7 @@ const FileUpload: React.FC = () => {
       setStatus("uploading");
       setMessage("업로드 중...");
 
-     await axios.post("/api/upload", formData);
+      await axios.post("http://localhost:8000/upload", formData);
 
       setStatus("success");
       setMessage("✅ 업로드 성공!");
@@ -63,8 +65,8 @@ const FileUpload: React.FC = () => {
       <button
         style={{ marginLeft: 10 }}
         onClick={handleUpload}
-        disabled={!file}   // 파일이 없으면 버튼 비활성화
-        >
+        disabled={!file} // 파일이 없으면 버튼 비활성화
+      >
         업로드
       </button>
 
