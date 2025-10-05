@@ -47,7 +47,10 @@ def cut_video_by_timestamps(video_path: str, timestamps: List[Tuple[float, float
             )
             audio_segments.append(
                 input_stream.audio.filter('atrim', start=start, end=end).filter('asetpts', 'PTS-STARTPTS')
-            )
+            ) 
+            # filter applies atrim and asetpts to the audio stream
+            # atrim trims the audio to the specified start and end times
+            # asetpts resets the audio timestamps to start from zero for each segment
 
         # Concatenate all video and audio segments
         concatenated_video = ffmpeg.concat(*video_segments, v=1, a=0)
