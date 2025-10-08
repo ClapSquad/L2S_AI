@@ -1,5 +1,7 @@
-# Sample videos
+# Sample videos, caches, outputs
 examples/
+cache
+output
 
 # Python cache
 __pycache__/
