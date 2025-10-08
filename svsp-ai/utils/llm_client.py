@@ -165,7 +165,7 @@ def call_openai(api_key: str, model: str, prompt: str,
 
 
 # Gemini(Vertex AI) 호출
-def call_gemini(model: str, prompt: str):
+def call_gemini(model: str, prompt: str, as_json: bool = False):
     # This function now uses the google-generativeai library, which uses an API key.
     if not VERTEXAI_AVAILABLE:
         raise RuntimeError("google-generativeai 라이브러리 설치 필요. `pip install google-generativeai`")
@@ -181,9 +181,21 @@ def call_gemini(model: str, prompt: str):
     genai.configure(api_key=api_key)
     gemini_model = genai.GenerativeModel(model_name=model)
 
-    response = gemini_model.generate_content(prompt)
+    generation_config = None
+    if as_json:
+        # Gemini JSON mode requires the prompt to explicitly ask for JSON.
+        # The model is then constrained to only output valid JSON.
+        generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
+
+    response = gemini_model.generate_content(prompt, generation_config=generation_config)
     text = response.text
-    return {"raw": str(response), "text": text}
+    out = {"raw": str(response), "text": text, "json": None}
+    if as_json:
+        try:
+            out["json"] = json.loads(text) if text else None
+        except json.JSONDecodeError:
+            out["json"] = None # Let the caller handle cases where JSON is invalid
+    return out
 
 
 # 메인 함수
@@ -202,7 +214,7 @@ def main():
                 raise RuntimeError('OPENAI_API_KEY 환경변수 필요')
             out = call_openai(api_key=api_key, model=args.model, prompt=args.prompt)
         elif args.provider == 'gemini':
-            out = call_gemini(model=args.model, prompt=args.prompt)
+            out = call_gemini(model=args.model, prompt=args.prompt, as_json=True)
         logging.debug(json.dumps(out, ensure_ascii=False, indent=2))
     except RateLimitError as e:
         logging.debug(json.dumps({'error': f"OpenAI Rate Limit Exceeded: {e}"}, ensure_ascii=False), file=sys.stderr)
