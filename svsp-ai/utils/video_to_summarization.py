@@ -43,6 +43,10 @@ def video_to_summarization(VIDEO_PATH):
         timestamps = summary_json["timestamps"]
         logging.info(f"Parsed timestamps for cutting: {timestamps}")
 
+        if os.path.exists(CACHE_PATH):
+            shutil.rmtree(CACHE_PATH)
+            logging.debug(f"Removed cache folder: {CACHE_PATH}")
+
         # The raw text response is no longer the primary source of data, but can be returned for logging/display
         return summarization_result['text'], timestamps
 
