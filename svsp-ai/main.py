@@ -36,7 +36,6 @@ def main():
                 output_path=VERTICAL_EXPORT_PATH
             )
             print(f"\n✨ Pipeline Complete. Final Vertical Video: {VERTICAL_EXPORT_PATH}")
-
         except subprocess.CalledProcessError as e:
             # FFmpeg 명령 자체의 실패
             print(f"\n🚨 Vertical export step failed (FFmpeg Command Error). Check error details above.")
@@ -53,7 +52,6 @@ def main():
         except Exception as e:
             # 예상치 못한 기타 오류 (Fallback)
             print(f"\n🚨 Vertical export step failed (Unexpected Error): {e}")
-
 
     elif os.path.exists(SUMMARIZED_VIDEO_PATH):
         print(f"\n✨ Pipeline Complete. Summarized Video: {SUMMARIZED_VIDEO_PATH}")

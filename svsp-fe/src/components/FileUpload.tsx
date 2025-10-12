@@ -1,81 +1,61 @@
-import React, { useState, type ChangeEvent } from "react";
-import axios from "axios";
+import React, { useState } from "react";
 
 const FileUpload: React.FC = () => {
-  const [file, setFile] = useState<File | null>(null);
-
-  // ✅ 업로드 상태와 메시지 추가
-  const [status, setStatus] = useState<
-    "idle" | "uploading" | "success" | "error"
-  >("idle");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
-      // 파일을 새로 선택했을 때 이전 메시지 초기화
-      setStatus("idle");
+      setSelectedFile(e.target.files[0]);
       setMessage("");
     }
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      setStatus("error");
+    if (!selectedFile) {
       setMessage("파일을 선택하세요.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
+    setUploading(true);
+    setMessage("");
 
     try {
-      setStatus("uploading");
-      setMessage("업로드 중...");
+      // 예시: 서버에 업로드 (백엔드 주소 바꾸세요)
+      const formData = new FormData();
+      formData.append("file", selectedFile);
 
-      await axios.post("http://localhost:8000/upload", formData);
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+        method: "POST",
+        body: formData,
+      });
 
-      setStatus("success");
-      setMessage("✅ 업로드 성공!");
-    } catch (err) {
-      console.error(err);
-      setStatus("error");
-      setMessage("❌ 업로드 실패. 다시 시도해주세요.");
-    }
-  };
-
-  // ✅ 상태별 색상 설정
-  const getMessageColor = () => {
-    switch (status) {
-      case "success":
-        return "green";
-      case "error":
-        return "red";
-      case "uploading":
-        return "blue";
-      default:
-        return "black";
+      if (response.ok) {
+        setMessage("✅ 업로드 성공!");
+      } else {
+        setMessage("❌ 업로드 실패");
+      }
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ 업로드 중 오류 발생");
+    } finally {
+      setUploading(false);
     }
   };
 
   return (
-    <div style={{ padding: 20, textAlign: "center" }}>
-      <h2>파일 업로드</h2>
+    <div style={{ padding: "20px", border: "1px solid #ddd", borderRadius: "8px", width: "300px" }}>
+      <h3>파일 업로드</h3>
       <input type="file" onChange={handleFileChange} />
       <button
-        style={{ marginLeft: 10 }}
+        style={{ marginLeft: "10px" }}
         onClick={handleUpload}
-        disabled={!file} // 파일이 없으면 버튼 비활성화
+        disabled={uploading}
       >
-        업로드
+        {uploading ? "업로드 중..." : "업로드"}
       </button>
-
-      {/* ✅ 상태 메시지 표시 */}
-      {message && (
-        <p style={{ marginTop: 15, color: getMessageColor(), fontWeight: 500 }}>
-          {message}
-        </p>
-      )}
+      {message && <p style={{ marginTop: "10px" }}>{message}</p>}
     </div>
   );
 };

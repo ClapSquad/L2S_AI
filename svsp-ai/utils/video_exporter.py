@@ -35,7 +35,6 @@ def export_social_media_vertical_video(input_path, output_path, resolution="1080
         "ffmpeg",
         "-i", input_path,
         "-filter_complex", filter_complex,
-
         "-map", "[v]",
         "-map", "0:a",
 
@@ -46,7 +45,6 @@ def export_social_media_vertical_video(input_path, output_path, resolution="1080
         "-s", resolution,  # 최종 해상도 설정
         "-c:a", "aac",
         "-b:a", "192k",
-
         "-y",
         output_path
     ]
