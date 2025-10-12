@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import FileUpload from "../components/FileUpload";
+import FileUpload from "../../components/FileUpload";
 
 const MyPage: React.FC = () => {
   const [user, setUser] = useState({
@@ -18,7 +18,9 @@ const MyPage: React.FC = () => {
       <h2>마이페이지</h2>
       <p>이메일: {user.email}</p>
       <p>이름: {user.name}</p>
-      <button onClick={() => alert("수정 기능은 아직 미구현입니다.")}>회원 정보 수정</button>
+      <button onClick={() => alert("수정 기능은 아직 미구현입니다.")}>
+        회원 정보 수정
+      </button>
       <button onClick={handleDelete} style={{ marginLeft: "10px" }}>
         회원 탈퇴
       </button>
