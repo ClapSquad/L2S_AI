@@ -4,6 +4,7 @@ from utils.video_processor import cut_video_by_timestamps
 from utils.video_exporter import export_social_media_vertical_video
 import os
 import argparse
+import subprocess  # subprocess.CalledProcessError 사용을 위해 임포트
 
 
 def main():
@@ -27,6 +28,7 @@ def main():
     if args.vertical_export:
         VERTICAL_EXPORT_PATH = os.path.join(OUTPUT_PATH, f"{base_filename}_reel.mp4")
 
+        # 피드백 2 반영: 구체적인 오류부터 처리
         try:
             print("\n--- Starting Social Media Export Step ---")
             export_social_media_vertical_video(
@@ -34,8 +36,22 @@ def main():
                 output_path=VERTICAL_EXPORT_PATH
             )
             print(f"\n✨ Pipeline Complete. Final Vertical Video: {VERTICAL_EXPORT_PATH}")
+        except subprocess.CalledProcessError as e:
+            # FFmpeg 명령 자체의 실패
+            print(f"\n🚨 Vertical export step failed (FFmpeg Command Error). Check error details above.")
+            # 이 오류는 video_exporter.py에서 이미 상세 내용을 출력하고 raise 했으므로 간단히 알림
+
+        except FileNotFoundError:
+            # FFmpeg 실행 파일 또는 입력 파일 없음
+            print(f"\n🚨 Vertical export step failed (File Not Found Error). Check FFmpeg installation or input path.")
+
+        except ValueError as e:
+            # video_exporter.py에서 해상도 포맷이 잘못되었을 때 발생하는 오류
+            print(f"\n🚨 Vertical export step failed (Invalid Parameter Error): {e}")
+
         except Exception as e:
-            print(f"\n🚨 Vertical export step failed: {e}")
+            # 예상치 못한 기타 오류 (Fallback)
+            print(f"\n🚨 Vertical export step failed (Unexpected Error): {e}")
 
     elif os.path.exists(SUMMARIZED_VIDEO_PATH):
         print(f"\n✨ Pipeline Complete. Summarized Video: {SUMMARIZED_VIDEO_PATH}")
