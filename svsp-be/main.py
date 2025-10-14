@@ -1,9 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from api.routes import healthcheck
 from api.routes import upload
+from api.routes import subtitle
+
+
+
 
 
 
@@ -23,6 +29,8 @@ app.add_middleware(
 
 app.include_router(healthcheck.router)
 app.include_router(upload.router)
+app.include_router(subtitle.router)
+
 
 
 @app.get("/", tags=["Root"])
