@@ -2,6 +2,7 @@
 examples/
 cache
 output
+generated
 
 # Python cache
 __pycache__/
