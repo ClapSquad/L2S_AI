@@ -47,8 +47,15 @@ def video_to_summarization(VIDEO_PATH):
             shutil.rmtree(CACHE_PATH)
             logging.debug(f"Removed cache folder: {CACHE_PATH}")
 
+        summarized_segments = []
+        for (text, (seg_start, seg_end)) in transcribed_segments:
+            for (ts_start, ts_end) in timestamps:
+                if seg_end >= ts_start and seg_start <= ts_end:
+                    summarized_segments.append((text, (seg_start, seg_end)))
+                    break
+
         # The raw text response is no longer the primary source of data, but can be returned for logging/display
-        return summarization_result['text'], timestamps
+        return summarized_segments, timestamps
 
     finally:
         if os.path.exists(CACHE_PATH):
