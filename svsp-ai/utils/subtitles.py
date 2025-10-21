@@ -2,6 +2,24 @@ import os, uuid, subprocess
 from typing import List, Tuple
 
 
+def remap_subtitles(summarized_segments):
+    """
+    summarized_segments: [(text, (orig_start, orig_end)), ...]
+    returns: [(text, (new_start, new_end))]  # in new timeline
+    """
+    remapped = []
+    current_time = 0.0
+
+    for text, (orig_start, orig_end) in summarized_segments:
+        seg_len = orig_end - orig_start
+        new_start = current_time
+        new_end = current_time + seg_len
+        remapped.append((text, (new_start, new_end)))
+        current_time = new_end
+
+    return remapped
+
+
 def seconds_to_srt_time(t: float) -> str:
     hours = int(t // 3600)
     minutes = int((t % 3600) // 60)
@@ -43,3 +61,5 @@ def burn_subtitles(file_name: str, summarized_segments: List[Tuple[str, Tuple[fl
         cmd = ["ffmpeg", "-y", "-i", input_path, "-i", srt_path, "-c", "copy", "-c:s", "mov_text", out_video]
 
     subprocess.run(cmd, check=True)
+
+    return out_video

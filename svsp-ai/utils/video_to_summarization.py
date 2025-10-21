@@ -4,7 +4,6 @@ from .llm_client import call_gemini
 import logging, shutil, os, json
 from typing import List, Tuple
 
-
 def video_to_summarization(VIDEO_PATH):
     CACHE_PATH = "./cache"
 
@@ -50,7 +49,8 @@ def video_to_summarization(VIDEO_PATH):
         summarized_segments = []
         for (text, (seg_start, seg_end)) in transcribed_segments:
             for (ts_start, ts_end) in timestamps:
-                if seg_end >= ts_start and seg_start <= ts_end:
+                overlap = min(seg_end, ts_end) - max(seg_start, ts_start)
+                if overlap > 0.5:  # 일정 부분 이상 겹치면 포함
                     summarized_segments.append((text, (seg_start, seg_end)))
                     break
 

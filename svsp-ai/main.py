@@ -2,10 +2,8 @@ from utils.video_to_summarization import video_to_summarization
 from utils.logging_initialization import initialize_logging
 from utils.video_processor import cut_video_by_timestamps
 from utils.video_exporter import export_social_media_vertical_video
-from utils.subtitles import burn_subtitles
-import os
-import argparse
-import subprocess  # subprocess.CalledProcessError 사용을 위해 임포트
+from utils.subtitles import burn_subtitles, remap_subtitles
+import os, argparse, subprocess, logging
 
 
 def main():
@@ -29,8 +27,10 @@ def main():
     cut_video_by_timestamps(VIDEO_PATH, timestamps, SUMMARIZED_VIDEO_PATH)
 
     if args.subtitles:
-        out_video = burn_subtitles(f"{base_filename}_summary.mp4", summarized_segments)
-        print("생성된 영상 경로:", out_video)
+        remapped = remap_subtitles(summarized_segments)
+        logging.debug(f"Remapped result => {remapped}")
+        out_video = burn_subtitles(f"{base_filename}_summary.mp4", remapped)
+        logging.debug(f"Subtitled video generated at {out_video}")
 
     if args.vertical_export:
         VERTICAL_EXPORT_PATH = os.path.join(OUTPUT_PATH, f"{base_filename}_reel.mp4")
@@ -59,9 +59,6 @@ def main():
         except Exception as e:
             # 예상치 못한 기타 오류 (Fallback)
             print(f"\n🚨 Vertical export step failed (Unexpected Error): {e}")
-
-    elif os.path.exists(SUMMARIZED_VIDEO_PATH):
-        print(f"\n✨ Pipeline Complete. Summarized Video: {SUMMARIZED_VIDEO_PATH}")
 
 
 if __name__ == '__main__':
