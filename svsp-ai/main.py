@@ -2,6 +2,7 @@ from utils.video_to_summarization import video_to_summarization
 from utils.logging_initialization import initialize_logging
 from utils.video_processor import cut_video_by_timestamps
 from utils.video_exporter import export_social_media_vertical_video
+from utils.subtitles import burn_subtitles
 import os
 import argparse
 import subprocess  # subprocess.CalledProcessError 사용을 위해 임포트
@@ -13,6 +14,8 @@ def main():
     parser.add_argument("-f", "--file", type=str, required=True, help="Path to the input video file")
     parser.add_argument("-v", "--vertical_export", action="store_true",
                         help="Exports a vertical (9:16) video optimized for social media.")
+    parser.add_argument("-s", "--subtitles", action="store_true",
+                        help="Burn caption into videos")
     args = parser.parse_args()
 
     VIDEO_PATH = args.file
@@ -22,8 +25,12 @@ def main():
 
     SUMMARIZED_VIDEO_PATH = os.path.join(OUTPUT_PATH, f"{base_filename}_summary.mp4")
 
-    summary_text, timestamps = video_to_summarization(VIDEO_PATH)
+    summarized_segments, timestamps = video_to_summarization(VIDEO_PATH)
     cut_video_by_timestamps(VIDEO_PATH, timestamps, SUMMARIZED_VIDEO_PATH)
+
+    if args.subtitles:
+        out_video = burn_subtitles(f"{base_filename}_summary.mp4", summarized_segments)
+        print("생성된 영상 경로:", out_video)
 
     if args.vertical_export:
         VERTICAL_EXPORT_PATH = os.path.join(OUTPUT_PATH, f"{base_filename}_reel.mp4")
