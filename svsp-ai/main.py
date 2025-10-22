@@ -17,7 +17,7 @@ def main():
     args = parser.parse_args()
 
     VIDEO_PATH = args.file
-    OUTPUT_PATH = "./output"
+    OUTPUT_PATH = "./assets"
     os.makedirs(OUTPUT_PATH, exist_ok=True)
     base_filename = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
 
@@ -26,39 +26,43 @@ def main():
     summarized_segments, timestamps = video_to_summarization(VIDEO_PATH)
     cut_video_by_timestamps(VIDEO_PATH, timestamps, SUMMARIZED_VIDEO_PATH)
 
-    if args.subtitles:
-        remapped = remap_subtitles(summarized_segments)
-        logging.debug(f"Remapped result => {remapped}")
-        out_video = burn_subtitles(f"{base_filename}_summary.mp4", remapped)
-        logging.debug(f"Subtitled video generated at {out_video}")
-
     if args.vertical_export:
         VERTICAL_EXPORT_PATH = os.path.join(OUTPUT_PATH, f"{base_filename}_reel.mp4")
 
         # 피드백 2 반영: 구체적인 오류부터 처리
         try:
-            print("\n--- Starting Social Media Export Step ---")
+            print("\n--- Vertical Export ---")
             export_social_media_vertical_video(
                 input_path=SUMMARIZED_VIDEO_PATH,
                 output_path=VERTICAL_EXPORT_PATH
             )
-            print(f"\n✨ Pipeline Complete. Final Vertical Video: {VERTICAL_EXPORT_PATH}")
+            print(f"\nCompleted. Final video: {VERTICAL_EXPORT_PATH}")
         except subprocess.CalledProcessError as e:
             # FFmpeg 명령 자체의 실패
-            print(f"\n🚨 Vertical export step failed (FFmpeg Command Error). Check error details above.")
+            print(f"\nVertical export step failed (FFmpeg Command Error). Check error details above.")
             # 이 오류는 video_exporter.py에서 이미 상세 내용을 출력하고 raise 했으므로 간단히 알림
 
         except FileNotFoundError:
             # FFmpeg 실행 파일 또는 입력 파일 없음
-            print(f"\n🚨 Vertical export step failed (File Not Found Error). Check FFmpeg installation or input path.")
+            print(f"\nVertical export step failed (File Not Found Error). Check FFmpeg installation or input path.")
 
         except ValueError as e:
             # video_exporter.py에서 해상도 포맷이 잘못되었을 때 발생하는 오류
-            print(f"\n🚨 Vertical export step failed (Invalid Parameter Error): {e}")
+            print(f"\nVertical export step failed (Invalid Parameter Error): {e}")
 
         except Exception as e:
             # 예상치 못한 기타 오류 (Fallback)
-            print(f"\n🚨 Vertical export step failed (Unexpected Error): {e}")
+            print(f"\nVertical export step failed (Unexpected Error): {e}")
+
+        if args.subtitles:
+            remapped = remap_subtitles(summarized_segments)
+            logging.debug(f"Remapped result => {remapped}")
+            out_video = burn_subtitles(
+                f"{base_filename}_reel.mp4" if args.vertical_export else f"{base_filename}_summary.mp4", 
+                remapped, 
+                OUTPUT_PATH, 
+                OUTPUT_PATH)
+            logging.debug(f"Subtitled video generated at {out_video}")
 
 
 if __name__ == '__main__':

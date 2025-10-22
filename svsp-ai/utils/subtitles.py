@@ -37,23 +37,23 @@ def segments_to_srt(segments: List[Tuple[str, Tuple[float, float]]], srt_path: s
             f.write(f"{i}\n{start_ts} --> {end_ts}\n{text}\n\n")
 
 
-UPLOAD_DIR = "output"
-OUTPUT_DIR = "generated"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# UPLOAD_DIR = "output"
+# OUTPUT_DIR = "generated"
+# os.makedirs(UPLOAD_DIR, exist_ok=True)
+# os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-def burn_subtitles(file_name: str, summarized_segments: List[Tuple[str, Tuple[float, float]]], burn_in: bool = True):
+def burn_subtitles(file_name: str, summarized_segments: List[Tuple[str, Tuple[float, float]]], video_path, output_path, burn_in: bool = True):
     """Burn or embed subtitles into the video"""
-    input_path = os.path.join(UPLOAD_DIR, file_name)
+    input_path = os.path.join(video_path, file_name)
 
     # Step 1: Transcribe -> SRT
     srt_filename = f"{os.path.splitext(file_name)[0]}_{uuid.uuid4().hex[:6]}.srt"
-    srt_path = os.path.join(OUTPUT_DIR, srt_filename)
+    srt_path = os.path.join(output_path, srt_filename)
     segments_to_srt(summarized_segments, srt_path)
 
     # Step 2: Add subtitles to video
-    out_video = os.path.join(OUTPUT_DIR, f"{os.path.splitext(file_name)[0]}_subtitled.mp4")
+    out_video = os.path.join(output_path, f"{os.path.splitext(file_name)[0]}_subtitled.mp4")
 
     if burn_in:
         cmd = ["ffmpeg", "-y", "-i", input_path, "-vf", f"subtitles={srt_path}", "-c:a", "copy", out_video]
