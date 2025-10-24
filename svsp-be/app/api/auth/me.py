@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, status
 
+from app.db.fakedb import fakedb
+
 router = APIRouter(
     prefix="/auth",
     tags=["Auth"])
@@ -13,4 +15,7 @@ async def get_current_user(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Require login"
         )
-    return {"user": user}
+
+    userData = fakedb.get(user)
+
+    return {"user": userData}

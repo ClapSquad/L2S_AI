@@ -32,5 +32,5 @@ async def login(
 
     return {
         "message": "Successfully logged in",
-        "user": email
+        "username": user.username
     }
