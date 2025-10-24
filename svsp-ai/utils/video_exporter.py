@@ -50,7 +50,7 @@ def export_social_media_vertical_video(input_path, output_path, resolution="1080
     ]
 
     # 3. FFmpeg 실행
-    print(f"\n--- Starting Social Media Export for {os.path.basename(input_path)} ---")
+    print(f"\n--- Starting Vertical Export for {os.path.basename(input_path)} ---")
     try:
         # stdout과 stderr를 캡처
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
