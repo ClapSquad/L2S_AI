@@ -1,7 +1,7 @@
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
-from app.api import healthcheck
+from app.api.health import healthcheck
 from app.api.file import upload
 from app.api.auth import register, login, logout, me
 from app.config.environments import SECRET_KEY, SESSION_EXPIRE_TIME

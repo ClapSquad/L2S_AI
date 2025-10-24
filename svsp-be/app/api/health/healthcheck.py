@@ -2,11 +2,12 @@ from fastapi import APIRouter
 
 router = APIRouter(
     prefix="/health",
-    tags=["HealthCheck"]
+    tags=["Health"]
 )
 
+
 @router.get(
-    "/healthcheck",
+    "/alive",
     summary="Health Check",
     description="Return data about whether server is live",
     responses={
