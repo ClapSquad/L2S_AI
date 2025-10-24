@@ -14,8 +14,3 @@ add_cors(application)
 add_session(application)
 add_static_file_serving(application)
 add_router(application)
-
-
-@application.get("/", tags=["Root"])
-async def root():
-    return {"message": "Hello World"}
