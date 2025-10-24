@@ -3,7 +3,7 @@ from app.api.file import upload
 from app.api.auth import register, login, logout, me
 
 
-def addRouter(application):
+def add_router(application):
     application.include_router(healthcheck.router)
     application.include_router(upload.router)
 

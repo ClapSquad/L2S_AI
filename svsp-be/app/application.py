@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from app.middleware.cors import addCORS
-from app.middleware.session import addSession
-from app.middleware.static import AddStaticFileServing
-from app.api.router import addRouter
+from app.middleware.cors import add_cors
+from app.middleware.session import add_session
+from app.middleware.static import add_static_file_serving
+from app.api.router import add_router
 
 application = FastAPI(
     title="SVSP FastAPI Service",
@@ -10,10 +10,10 @@ application = FastAPI(
     version="1.0.0"
 )
 
-addCORS(application)
-addSession(application)
-AddStaticFileServing(application)
-addRouter(application)
+add_cors(application)
+add_session(application)
+add_static_file_serving(application)
+add_router(application)
 
 
 @application.get("/", tags=["Root"])

@@ -2,7 +2,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 
-def AddStaticFileServing(application):
+def add_static_file_serving(application):
     BASE_DIR = (
         os.path.dirname(
             os.path.dirname(

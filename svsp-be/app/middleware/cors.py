@@ -1,7 +1,7 @@
 from fastapi.middleware.cors import CORSMiddleware
 
 
-def addCORS(application):
+def add_cors(application):
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173"],  # FE dev server
