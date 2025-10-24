@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Response, HTTPException, status
 from pydantic import BaseModel
-from app.fakedb import fakedb
+from app.db.fakedb import fakedb
 
 router = APIRouter(
     prefix="/auth",

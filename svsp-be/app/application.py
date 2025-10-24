@@ -3,7 +3,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
 from app.api import healthcheck, upload
 from app.api.auth import register, login, logout, me
-from app.config import SECRET_KEY, SESSION_EXPIRE_TIME
+from app.config.environments import SECRET_KEY, SESSION_EXPIRE_TIME
 
 application = FastAPI(
     title="SVSP FastAPI Service",

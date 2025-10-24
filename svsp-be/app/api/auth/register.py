@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from app.fakedb import fakedb
+from app.db.fakedb import fakedb
 from app.model.user import UserModel
 
 router = APIRouter(

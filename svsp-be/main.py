@@ -1,6 +1,6 @@
 import uvicorn
 from app.application import application
-from app.config import PORT
+from app.config.environments import PORT
 
 if __name__ == "__main__":
     uvicorn.run(
