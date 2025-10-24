@@ -1,11 +1,11 @@
 from fastapi import APIRouter, UploadFile, File
-import os
-import shutil  # added
+import os, shutil
 
 router = APIRouter()
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
