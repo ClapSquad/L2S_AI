@@ -1,25 +1,11 @@
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
-from api.routes import healthcheck
-from api.routes import upload
+import uvicorn
+from app.application import application
+from app.config import PORT
 
-app = FastAPI(
-    title="SVSP FastAPI Service",
-    description="Semantic Video Summarization Pipeline Backend API documentation",
-    version="1.0.0"
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # FE dev server
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(healthcheck.router)
-app.include_router(upload.router)
-
-
-@app.get("/", tags=["Root"])
-async def root():
-    return {"message": "Hello World"}
+if __name__ == "__main__":
+    uvicorn.run(
+        application,
+        host="0.0.0.0",
+        port=PORT,
+        reload=False
+    )

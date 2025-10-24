@@ -1,9 +1,9 @@
-# api/routes/healthcheck.py
+# api/api/healthcheck.py
 from fastapi import APIRouter
 
 router = APIRouter(
     prefix="/health",
-    tags=["Health Check"]
+    tags=["HealthCheck"]
 )
 
 @router.get(
