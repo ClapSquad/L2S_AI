@@ -1,7 +1,9 @@
 from fastapi import APIRouter, UploadFile, File
 import os, shutil
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/file",
+    tags=["File"])
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
