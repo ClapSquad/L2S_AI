@@ -1,10 +1,8 @@
 from fastapi import FastAPI
-from app.api.health import healthcheck
-from app.api.file import upload
-from app.api.auth import register, login, logout, me
 from app.middleware.cors import addCORS
 from app.middleware.session import addSession
 from app.middleware.static import AddStaticFileServing
+from app.api.router import addRouter
 
 application = FastAPI(
     title="SVSP FastAPI Service",
@@ -15,14 +13,7 @@ application = FastAPI(
 addCORS(application)
 addSession(application)
 AddStaticFileServing(application)
-
-application.include_router(healthcheck.router)
-application.include_router(upload.router)
-
-application.include_router(register.router)
-application.include_router(login.router)
-application.include_router(logout.router)
-application.include_router(me.router)
+addRouter(application)
 
 
 @application.get("/", tags=["Root"])
