@@ -1,3 +1,4 @@
+import uuid
 from utils.video_to_summarization import video_to_summarization
 from utils.logging_initialization import initialize_logging
 from utils.video_processor import cut_video_by_timestamps
@@ -17,9 +18,9 @@ def main():
     args = parser.parse_args()
 
     VIDEO_PATH = args.file
-    OUTPUT_PATH = "./assets"
-    os.makedirs(OUTPUT_PATH, exist_ok=True)
     base_filename = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
+    OUTPUT_PATH = "./assets" + "/" + base_filename + f"_{uuid.uuid4().hex[:6]}"
+    os.makedirs(OUTPUT_PATH, exist_ok=True)
 
     SUMMARIZED_VIDEO_PATH = os.path.join(OUTPUT_PATH, f"{base_filename}_summary.mp4")
 
