@@ -1,10 +1,12 @@
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
 from app.api.health import healthcheck
 from app.api.file import upload
 from app.api.auth import register, login, logout, me
 from app.config.environments import SECRET_KEY, SESSION_EXPIRE_TIME
+import os
 
 application = FastAPI(
     title="SVSP FastAPI Service",
@@ -31,6 +33,17 @@ application.include_router(register.router)
 application.include_router(login.router)
 application.include_router(logout.router)
 application.include_router(me.router)
+
+BASE_DIR = (
+    os.path.dirname(
+        os.path.dirname(
+            os.path.abspath(__file__)
+        )
+
+    )
+)
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+application.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 @application.get("/", tags=["Root"])
