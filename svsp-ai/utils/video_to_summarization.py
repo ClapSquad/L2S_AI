@@ -39,8 +39,34 @@ def video_to_summarization(VIDEO_PATH):
         if not summary_json or "timestamps" not in summary_json:
             raise Exception(f"Failed to get valid timestamps from LLM. Response: {summary_json}")
 
-        timestamps = summary_json["timestamps"]
+        timestamps: List[Tuple[float, float]] = summary_json["timestamps"]
         logging.info(f"Parsed timestamps for cutting: {timestamps}")
+
+        # Extract text for the summarized segments
+        summarized_text = " ".join(
+            text for text, (start, end) in transcribed_segments
+            if any(ts_start <= start and end <= ts_end for ts_start, ts_end in timestamps)
+        )
+        logging.debug(f"Summarized text for title generation: {summarized_text}")
+
+        # Generate a hook title based on the summarized text
+        title_prompt = f"""
+        You are a viral content creator.
+        Based on the following video transcript, generate a short, catchy, and engaging hook title for a social media video.
+        The title should be at most 10 words.
+
+        Hard constraints:
+        - Use only letters (A–Z, a–z), numbers (0–9), and spaces.
+        - Do NOT use punctuation, emojis, symbols, or special characters.
+        - Do NOT put the title in quotes or code blocks.
+        - Output a single line containing ONLY the title text.
+
+        Transcript:
+        {summarized_text}
+        """
+        title_result = call_gemini("gemini-2.5-flash", title_prompt)
+        hook_title = title_result.get('text', "Video Summary").strip()
+        logging.info(f"Generated hook title: {hook_title}")
 
         if os.path.exists(CACHE_PATH):
             shutil.rmtree(CACHE_PATH)
@@ -55,7 +81,7 @@ def video_to_summarization(VIDEO_PATH):
                     break
 
         # The raw text response is no longer the primary source of data, but can be returned for logging/display
-        return summarized_segments, timestamps
+        return hook_title, summarized_segments, timestamps
 
     finally:
         if os.path.exists(CACHE_PATH):
