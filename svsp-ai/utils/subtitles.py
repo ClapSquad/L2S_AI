@@ -48,7 +48,7 @@ def burn_subtitles(file_name: str, summarized_segments: List[Tuple[str, Tuple[fl
     input_path = os.path.join(video_path, file_name)
 
     # Step 1: Transcribe -> SRT
-    srt_filename = f"{os.path.splitext(file_name)[0]}_{uuid.uuid4().hex[:6]}.srt"
+    srt_filename = f"{os.path.splitext(file_name)[0]}.srt"
     srt_path = os.path.join(output_path, srt_filename)
     segments_to_srt(summarized_segments, srt_path)
 
