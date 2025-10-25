@@ -21,7 +21,6 @@ def main():
     base_filename = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
 
     hook_title, summarized_segments, timestamps = video_to_summarization(VIDEO_PATH)
-    hook_title = hook_title
 
     OUTPUT_PATH = "./assets" + "/" + base_filename + f"_{uuid.uuid4().hex[:6]}"
     os.makedirs(OUTPUT_PATH, exist_ok=True)
