@@ -14,7 +14,7 @@ from youtube_commons import youtube_commons_build_data
 """
 
 Usage:
-    python evaluation/datasets/load_data.py --n_samples 100 --min_dur 3.0 --max_dur 30.0 --out /path/to/output
+    python evaluation/datasets/load_data.py --n_samples 100 --out /path/to/output
 
 Output:
     Creates a CSV file at /path/to/output/yt_commons_sample.csv containing up to 100 randomly sampled entries from the YouTube-Commons dataset,

@@ -10,10 +10,10 @@ Works when your CSV has one of these columns (any name is fine, it auto-detects)
   - id (YouTube ID like 'dQw4w9WgXcQ')
 
 Usage examples:
-  python download_videos_from_csv.py --csv yt_commons.csv
-  python download_videos_from_csv.py --csv yt_commons.csv --quality 720p --out-dir downloads720
-  python download_videos_from_csv.py --csv yt_commons.csv --url-col my_custom_url_col
-  python download_videos_from_csv.py --csv yt_commons.csv --cookies cookies.txt
+  python download.py --csv yt_commons.csv
+  python download.py --csv yt_commons.csv --quality 720p --out-dir output/directory
+  python download.py --csv yt_commons.csv --url-col my_custom_url_col
+  python download.py --csv yt_commons.csv --cookies cookies.txt
 
 Requires:
   pip install yt-dlp
