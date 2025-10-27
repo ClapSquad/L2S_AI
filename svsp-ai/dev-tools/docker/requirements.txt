@@ -4,3 +4,7 @@ ffmpeg-python
 python-dotenv
 openai
 google-generativeai
+ijson
+datasets
+yt-dlp
+jiwer
