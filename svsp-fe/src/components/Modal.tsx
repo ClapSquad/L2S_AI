@@ -12,10 +12,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
 
   return (
     <ModalWrapper onClick={onClose}>
-      <ModalWindow onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose}>x</button>
-        {children}
-      </ModalWindow>
+      <ModalWindow onClick={(e) => e.stopPropagation()}>{children}</ModalWindow>
     </ModalWrapper>
   );
 }
