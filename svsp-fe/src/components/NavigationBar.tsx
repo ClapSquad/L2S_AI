@@ -1,19 +1,44 @@
 import routePath from "@router/routePath";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import styled from "styled-components";
+import { LoginIcon } from "src/icons/LoginIcon";
+import { globalButtonStyle } from "@styles/globalStyle";
+import Logo from "./Logo";
 
 export default function NavigationBar() {
+  const navigate = useNavigate();
   return (
-    <nav style={{ marginBottom: "20px" }}>
-      <Link to={routePath.HOME} style={{ marginRight: "10px" }}>
-        홈페이지
-      </Link>
-      <Link to={routePath.LOGIN} style={{ marginRight: "10px" }}>
-        로그인
-      </Link>
-      <Link to={routePath.REGISTER} style={{ marginRight: "10px" }}>
-        회원가입
-      </Link>
-      <Link to={routePath.MY}>마이페이지</Link>
-    </nav>
+    <NavigationBarWrapper>
+      <HomeButton onClick={() => navigate(routePath.HOME)}>
+        <Logo size="40px" />
+      </HomeButton>
+      <ButtonSet>
+        <LoginButton onClick={() => navigate(routePath.LOGIN)}>
+          <LoginIcon size="30" color="black" />
+        </LoginButton>
+      </ButtonSet>
+    </NavigationBarWrapper>
   );
 }
+
+const HomeButton = styled.button`
+  ${globalButtonStyle}
+  padding: 10px;
+`;
+
+const LoginButton = styled.button`
+  ${globalButtonStyle}
+`;
+
+const ButtonSet = styled.div`
+  display: flex;
+
+  padding: 4px;
+`;
+
+const NavigationBarWrapper = styled.nav`
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+`;
