@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { LoginIcon } from "src/icons/LoginIcon";
 import { globalButtonStyle } from "@styles/globalStyle";
-import Logo from "./Logo";
 import { SettingsIcon } from "src/icons/SettingsIcon";
-import { Modal } from "./Modal";
 import { useModal } from "@hooks/useModal";
-import SettingModal from "./SettingModal";
+import { Modal } from "@components/Modal";
+import SettingModal from "@components/SettingModal";
+import Logo from "@components/Logo";
 
 export default function NavigationBar() {
   const navigate = useNavigate();
@@ -51,4 +51,5 @@ const NavigationBarWrapper = styled.nav`
   align-items: center;
 
   padding: 8px;
+  height: 40px;
 `;

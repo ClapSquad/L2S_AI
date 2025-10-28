@@ -1,14 +1,18 @@
 import styled from "styled-components";
 import a from "./assets/Long2ShortTextHorizontal.png";
 import Logo from "@components/Logo";
+import NavigationBar from "./components/NavigationBar";
 
 export default function MainPage() {
   return (
-    <MainPageWrapper>
-      <Logo size="20%" />
-      <LargeText src={a} />
-      <Heading>시간은 짧게, 인사이트는 깊게</Heading>
-    </MainPageWrapper>
+    <>
+      <NavigationBar />
+      <MainPageWrapper>
+        <Logo size="20%" />
+        <LargeText src={a} />
+        <Heading>시간은 짧게, 인사이트는 깊게</Heading>
+      </MainPageWrapper>
+    </>
   );
 }
 
