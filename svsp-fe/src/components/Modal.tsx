@@ -30,9 +30,6 @@ const ModalWrapper = styled.div`
 `;
 
 const ModalWindow = styled.div`
-  background: white;
-  border-radius: 8px;
   box-shadow: inset;
-  padding: 20px;
   position: relative;
 `;
