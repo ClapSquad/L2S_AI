@@ -2,7 +2,7 @@ import os
 from datasets import load_dataset
 import shutil
 
-def youtube_commons_build_data(out_csv, n_samples, lang, min_dur, max_dur):
+def youtube_commons_build_data(out_csv, n_samples):
     """
     Loads and samples data from the YouTube-Commons dataset.
     """
