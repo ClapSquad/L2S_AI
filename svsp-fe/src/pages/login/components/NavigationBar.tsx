@@ -41,6 +41,7 @@ const ButtonSet = styled.div`
 `;
 
 const NavigationBarWrapper = styled.nav`
+  align-self: normal;
   display: flex;
 
   justify-content: space-between;
