@@ -1,3 +1,5 @@
+import axios from "axios";
+axios.defaults.withCredentials = true;
 import React from "react";
 import { useForm } from "react-hook-form";
 
@@ -13,9 +15,17 @@ const LoginPage: React.FC = () => {
     formState: { errors },
   } = useForm<LoginFormData>();
 
-  const onSubmit = (data: LoginFormData) => {
-    alert(`로그인 시도: ${data.email}`);
+  const onSubmit = async (data: LoginFormData) => {
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/auth/login", data);
+      alert("로그인 성공!");
+      console.log(res.data); // for debugging
+    } catch (err: any) {
+      console.error(err);
+      alert("로그인 실패. 이메일 또는 비밀번호를 확인해주세요.");
+    }
   };
+  
 
   return (
     <div>

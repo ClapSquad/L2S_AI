@@ -1,3 +1,6 @@
+import axios from "axios";
+
+axios.defaults.withCredentials = true;
 import NavigationBar from "@components/NavigationBar";
 import Router from "@router/Router";
 import { BrowserRouter } from "react-router-dom";
