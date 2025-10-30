@@ -4,3 +4,7 @@ ffmpeg-python
 python-dotenv
 openai
 google-generativeai
+bs4
+selenium
+webdriver-manager
+matplotlib
