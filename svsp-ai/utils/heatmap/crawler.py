@@ -16,7 +16,7 @@ CONST_YOUTUBE_HEATMAP_Y_BASE = 100.0
 PARAM_GAUSSIAN_SMOOTHING_SIGMA = 1
 PARAM_EXTREMUM_ONE_SIDE_WINDOW_SIZE_IN_SECONDS = 1
 PARAM_EXTREMUM_PICK_WINDOW_SIZE_IN_SECONDS = 30
-
+PARAM_YOUTUBE_CRAWLER_TIMEOUT_IN_SECOND = 30
 
 def get_heatmap_path_and_duration(video_id: str):
     url = f"https://www.youtube.com/watch?v={video_id}"
@@ -31,7 +31,7 @@ def get_heatmap_path_and_duration(video_id: str):
     driver.get(url)
 
     try:
-        wait = WebDriverWait(driver, 15)
+        wait = WebDriverWait(driver, PARAM_YOUTUBE_CRAWLER_TIMEOUT_IN_SECOND)
 
         # Heatmap
         path_elem = wait.until(
@@ -48,7 +48,7 @@ def get_heatmap_path_and_duration(video_id: str):
 
     except Exception as e:
         print("SVG not found:", e)
-        return None
+        return None, None
     finally:
         driver.quit()
 
@@ -172,7 +172,7 @@ def get_most_watched_timestamp(video_id: str, show_on_graph=False):
         print("✅ Heatmap found")
     else:
         print("❌ Heatmap not found")
-        return
+        return None
     d = get_d_from_path(path_html)
     duration_in_seconds = time_to_seconds(video_duration)
 
