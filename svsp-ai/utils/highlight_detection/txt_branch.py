@@ -6,7 +6,7 @@ def compute_txt_branch(video_path):
     Re-use the existing Gemini summarizer as the TXT branch.
     Returns: list of [start, end] spans.
     """
-    _, timestamps = video_to_summarization(video_path)
+    _, _, timestamps = video_to_summarization(video_path)
     return timestamps
 
 def txt_score_per_shot(shots, spans):
