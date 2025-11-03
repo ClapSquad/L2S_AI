@@ -1,6 +1,4 @@
-import os
-import csv
-import json
+import csv, json
 from crawler import get_most_watched_timestamp
 import numpy as np
 
@@ -48,7 +46,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
-    mwt = get_most_watched_timestamp("24GfgNtnjXc")
-    if mwt is not None:
-        append_result_to_jsonl("24GfgNtnjXc", mwt, CONST_OUTPUT_FILE_NAME)
+    main()
