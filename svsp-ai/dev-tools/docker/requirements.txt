@@ -4,6 +4,10 @@ ffmpeg-python
 python-dotenv
 openai
 google-generativeai
+bs4
+selenium
+webdriver-manager
+matplotlib
 "opencv-python-headless==4.8.1.78"
 "scenedetect==0.6.4" --no-deps
 open-clip-torch
