@@ -4,3 +4,7 @@ __pycache__/
 
 # Uploaded media files
 uploads
+
+#Don’t track any .mp4 files inside the svsp-be/generated folder
+svsp-be/generated/*.mp4
+
