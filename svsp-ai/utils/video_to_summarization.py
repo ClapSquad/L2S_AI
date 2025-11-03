@@ -19,18 +19,39 @@ def video_to_summarization(VIDEO_PATH):
         logging.debug(f"Transcription result => {transcribed_segments}")
 
         prompt = f"""
-        You are a video summarization assistant.
-        Given a list of transcribed segments with timestamps, select the most important segments to create a summary of up to 1 minute.
-        Respond with a JSON object containing a single key "timestamps", which is a list of [start, end] arrays for the selected segments.
+            You are a video summarization assistant.
 
-        Example Input:
-        [('Hello world.', (0.5, 1.5)), ('This is a test.', (2.0, 3.0)), ('Another important segment.', (10.0, 12.5))]
+            Goal:
+            Select the most important segments from the transcript to make a concise highlight summary whose
+            TOTAL duration ≤ 60.0 seconds. Prefer segments that are self-contained and informative.
 
-        Example Output:
-        {{ "timestamps": [ [0.5, 1.5], [10.0, 12.5] ] }}
+            Inputs:
+            - "Transcribed Segments" is a Python-like list of tuples: (text, (start_time, end_time)).
+            - Times are in seconds (float).
 
-        Transcribed Segments:
-        {str(transcribed_segments)}
+            Hard rules:
+            1) Output valid JSON only (no prose), matching this schema:
+            {{
+                "timestamps": [ [start, end], ... ]    // non-overlapping, sorted by start ASC
+            }}
+            2) Each [start, end] must satisfy: 0 ≤ start < end, and (end - start) ≥ 2.0 seconds.
+            3) Merge or skip highly overlapping or adjacent (< 0.75s gap) segments to keep context.
+            4) Ensure TOTAL duration (sum over all segments) ≤ 60.0 seconds.
+            5) Do NOT invent timestamps that are not present in input; you may extend to merge adjacent by up to 0.75s.
+            6) Keep language as-is (don’t translate text).
+            7) If no meaningful segments exist, return {{ "timestamps": [] }}.
+
+            Tie-breaking (if needed):
+            - Prefer segments with concrete facts, steps, or outcomes.
+            - Prefer segments that do not require external context.
+            - Prefer segments that include key conclusions or demonstrations.
+
+            Output examples:
+            OK → {{ "timestamps": [[0.50, 7.80], [12.00, 24.10], [45.00, 58.70]] }}
+            OK (empty) → {{ "timestamps": [] }}
+
+            Transcribed Segments:
+            {{transcribed_segments}}
         """
         summarization_result = call_gemini("gemini-2.5-flash", prompt, as_json=True)
         summary_json = summarization_result.get('json')
