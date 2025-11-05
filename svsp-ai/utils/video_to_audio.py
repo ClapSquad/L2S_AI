@@ -16,6 +16,7 @@ def convert_video_to_audio(video_path, output_folder='.'):
             "-i", video_path,
             "-q:a", "0",
             "-map", "a",
+            "-loglevel", "error",
             audio_path
         ], check=True)
         logging.debug("Audio conversion done.")
