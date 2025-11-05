@@ -47,14 +47,16 @@ def main():
         timestamps = llm_timestamps
     else:
         from utils.highlight_detection.highlight_pipeline import run_echofusion
-        timestamps = run_echofusion(
+        predictions = run_echofusion(
             video_path,
             title=args.title or "",
-            summary=hook_title or "",
+            summary=summarized_segments or "",
+            llm_timestamps=llm_timestamps,
             w_hd=args.w_hd, w_txt=args.w_txt, w_aud=args.w_aud,
             keep_seconds=args.keep_seconds
         )
-        json.dump(timestamps, open(os.path.join(output_dir, f"{base_filename}_timestamps.json"), "w"), indent=2)
+        timestamps = [[start, end] for start, end, score, rank in predictions]
+        json.dump(predictions, open(os.path.join(output_dir, f"{base_filename}_timestamps.json"), "w"), indent=2)
 
     # --- Create summarized video ---
     summarized_video_path = os.path.join(output_dir, f"{hook_title}_summary.mp4")
