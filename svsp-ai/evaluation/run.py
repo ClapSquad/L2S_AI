@@ -37,27 +37,24 @@ def batch_run_echofusion(video_folder: str):
     with open(output_jsonl_path, "a") as outfile:
         for video_path in video_paths:
             print(f"\n--- ({count+1}/{len(video_paths)}) Processing: {video_path.name} ---")
-            try:
-                # [[start, end, score, rank], ...]
-                print("-> Generating LLM timestamps ...")
-                _, summarized_segments, llm_timestamps = video_to_summarization(video_path)
+            # [[start, end, score, rank], ...]
+            print("-> Generating LLM timestamps ...")
+            _, summarized_segments, llm_timestamps = video_to_summarization(video_path)
 
-                print("-> Running Echofusion ...")
-                predictions = run_echofusion(
-                    str(video_path),
-                    summary=summarized_segments or "",
-                    llm_timestamps=llm_timestamps
-                )
-                
-                highlights = [{"start": p[0], "end": p[1], "score": p[2], "rank": p[3]} for p in predictions]
+            print("-> Running Echofusion ...")
+            predictions = run_echofusion(
+                str(video_path),
+                summary=summarized_segments or "",
+                llm_timestamps=llm_timestamps
+            )
 
-                result = {"video_name": video_path.name, "highlights": highlights}
-                outfile.write(json.dumps(result) + "\n")
-                outfile.flush()
-                print(f"✅ Saved predictions for {video_path.name}")
-                count += 1
-            except Exception as e:
-                print(f"❌ Failed to process {video_path.name}: {e}")
+            highlights = [{"start": p[0], "end": p[1], "score": p[2], "rank": p[3]} for p in predictions]
+
+            result = {"video_name": video_path.name, "highlights": highlights}
+            outfile.write(json.dumps(result) + "\n")
+            outfile.flush()
+            print(f"✅ Saved predictions for {video_path.name}")
+            count += 1
 
 def main():
     

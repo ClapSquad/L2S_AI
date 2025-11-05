@@ -1,67 +1,33 @@
-from .video_to_audio import convert_video_to_audio
-from .audio_to_text import transcribe_audio
 from .llm_client import call_gemini
-import logging, shutil, os, json
-from typing import List, Tuple
+import logging, shutil, os, json, ast
 
 def video_to_summarization(VIDEO_PATH):
     CACHE_PATH = "./cache"
 
     try:
-        audio_file = convert_video_to_audio(VIDEO_PATH, CACHE_PATH)
-        if not audio_file:
-            raise Exception("Audio conversion failed.")
+        filename = os.path.basename(VIDEO_PATH)
+        video_id = os.path.splitext(filename)[0]
 
-        audio_path = os.path.join(CACHE_PATH, audio_file)
-        transcribed_segments = transcribe_audio(audio_path)
-        if not isinstance(transcribed_segments, list):
-             raise Exception(f"Transcription failed: {transcribed_segments}")
-        logging.debug(f"Transcription result => {transcribed_segments}")
+        transcribed_segments = None
+        with open(r"transcribed_data.jsonl", "r") as f:
+            for line in f:
+                data = json.loads(line)
+                if data.get("id") == video_id:
+                    transcribed_segments = ast.literal_eval(data["text"])
+                    break
 
-        prompt = f"""
-            You are a video summarization assistant.
+        transcribed_segments = [
+            (seg[0].strip(), (float(seg[1][0]), float(seg[1][1])))
+            for seg in transcribed_segments
+        ]
 
-            Goal:
-            Select the most important segments from the transcript to make a concise highlight summary whose
-            TOTAL duration ≤ 60.0 seconds. Prefer segments that are self-contained and informative.
-
-            Inputs:
-            - "Transcribed Segments" is a Python-like list of tuples: (text, (start_time, end_time)).
-            - Times are in seconds (float).
-
-            Hard rules:
-            1) Output valid JSON only (no prose), matching this schema:
-            {{
-                "timestamps": [ [start, end], ... ]    // non-overlapping, sorted by start ASC
-            }}
-            2) Each [start, end] must satisfy: 0 ≤ start < end, and (end - start) ≥ 2.0 seconds.
-            3) Merge or skip highly overlapping or adjacent (< 0.75s gap) segments to keep context.
-            4) Ensure TOTAL duration (sum over all segments) ≤ 60.0 seconds.
-            5) Do NOT invent timestamps that are not present in input; you may extend to merge adjacent by up to 0.75s.
-            6) Keep language as-is (don’t translate text).
-            7) If no meaningful segments exist, return {{ "timestamps": [] }}.
-
-            Tie-breaking (if needed):
-            - Prefer segments with concrete facts, steps, or outcomes.
-            - Prefer segments that do not require external context.
-            - Prefer segments that include key conclusions or demonstrations.
-
-            Output examples:
-            OK → {{ "timestamps": [[0.50, 7.80], [12.00, 24.10], [45.00, 58.70]] }}
-            OK (empty) → {{ "timestamps": [] }}
-
-            Transcribed Segments:
-            {{transcribed_segments}}
-        """
-        summarization_result = call_gemini("gemini-2.5-flash", prompt, as_json=True)
-        summary_json = summarization_result.get('json')
-        logging.debug(f"Summarization result => {summary_json}")
-
-        if not summary_json or "timestamps" not in summary_json:
-            raise Exception(f"Failed to get valid timestamps from LLM. Response: {summary_json}")
-
-        timestamps: List[Tuple[float, float]] = summary_json["timestamps"]
-        logging.info(f"Parsed timestamps for cutting: {timestamps}")
+        timestamps = None
+        with open(r"summarized_results.jsonl", "r") as f:
+            for line in f:
+                data = json.loads(line)
+                if data.get("id") == video_id:
+                    timestamps = data["result"]["timestamps"]
+                    break
 
         # Extract text for the summarized segments
         summarized_text = " ".join(
