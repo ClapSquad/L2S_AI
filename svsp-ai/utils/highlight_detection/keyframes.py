@@ -1,11 +1,12 @@
 import os, pathlib, subprocess
+from tqdm import tqdm
 
 def extract_keyframes(video_path, shots, fps=1.0):
     stem = pathlib.Path(video_path).stem
     base_dir = pathlib.Path("data/keyframes") / stem
     base_dir.mkdir(parents=True, exist_ok=True)
 
-    for shot in shots:
+    for shot in tqdm(shots, desc="Extracting keyframes"):
         sid = f"{shot['shot_id']:04d}"
         out_dir = base_dir / f"shot_{sid}"
         out_dir.mkdir(parents=True, exist_ok=True)

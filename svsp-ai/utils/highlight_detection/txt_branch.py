@@ -1,13 +1,4 @@
-# utils/highlight_detection/txt_branch.py
-from utils.video_to_summarization import video_to_summarization
-
-def compute_txt_branch(video_path):
-    """
-    Re-use the existing Gemini summarizer as the TXT branch.
-    Returns: list of [start, end] spans.
-    """
-    _, _, timestamps = video_to_summarization(video_path)
-    return timestamps
+from tqdm import tqdm
 
 def txt_score_per_shot(shots, spans):
     """Convert LLM spans → per-shot TXT coverage scores."""
@@ -18,7 +9,7 @@ def txt_score_per_shot(shots, spans):
         return overlap / max(e0 - s0, 1e-6)
 
     out = []
-    for sh in shots:
+    for sh in tqdm(shots, desc="Calculating TXT branch scores"):
         s, e = sh["start"], sh["end"]
         out.append({
             "shot_id": sh["shot_id"],
