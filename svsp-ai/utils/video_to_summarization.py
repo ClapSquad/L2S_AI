@@ -8,11 +8,13 @@ def video_to_summarization(VIDEO_PATH):
     CACHE_PATH = "./cache"
 
     try:
+        print("-> Converting video to audio ...")
         audio_file = convert_video_to_audio(VIDEO_PATH, CACHE_PATH)
         if not audio_file:
             raise Exception("Audio conversion failed.")
 
         audio_path = os.path.join(CACHE_PATH, audio_file)
+        print("-> Transcribing audio ...")
         transcribed_segments = transcribe_audio(audio_path)
         if not isinstance(transcribed_segments, list):
              raise Exception(f"Transcription failed: {transcribed_segments}")
@@ -53,6 +55,7 @@ def video_to_summarization(VIDEO_PATH):
             Transcribed Segments:
             {{transcribed_segments}}
         """
+        print("-> Generating summarization timestamps via LLM ...")
         summarization_result = call_gemini("gemini-2.5-flash", prompt, as_json=True)
         summary_json = summarization_result.get('json')
         logging.debug(f"Summarization result => {summary_json}")
@@ -85,6 +88,7 @@ def video_to_summarization(VIDEO_PATH):
         Transcript:
         {summarized_text}
         """
+        print("-> Generating hook title ...")
         title_result = call_gemini("gemini-2.5-flash", title_prompt)
         hook_title = title_result.get('text', "Video Summary").strip()
         logging.info(f"Generated hook title: {hook_title}")
@@ -106,4 +110,6 @@ def video_to_summarization(VIDEO_PATH):
 
     finally:
         if os.path.exists(CACHE_PATH):
+            print("-> Cleaning up cache ...")
+            shutil.rmtree(CACHE_PATH)
             logging.debug(f"Removed cache folder: {CACHE_PATH}")

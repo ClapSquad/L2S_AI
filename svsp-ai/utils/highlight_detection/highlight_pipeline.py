@@ -20,6 +20,7 @@ def run_echofusion(video_path, title="", summary="", llm_timestamps=[], **overri
     stem = pathlib.Path(video_path).stem
     hd_path = f"data/shots/{stem}.hd.json"
     json.dump(hd, open(hd_path,"w"), indent=2)
+    print(f"-> Done. HD scores saved to {hd_path}")
 
     if not llm_timestamps:
         print("-> No LLM timestamps provided, generating via video_to_summarization ...")
@@ -30,6 +31,7 @@ def run_echofusion(video_path, title="", summary="", llm_timestamps=[], **overri
     txt = txt_score_per_shot(shots, llm_timestamps)
     txt_path = f"data/shots/{stem}.txt.json"
     json.dump(txt, open(txt_path,"w"), indent=2)
+    print(f"-> Done. TXT scores saved to {txt_path}")
     
     print("\n--- Step 3: Fusion and Highlight Selection ---")
     predictions = fuse_and_select(video_path, hd_path, txt_path,
