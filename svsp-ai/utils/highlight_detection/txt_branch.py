@@ -1,12 +1,22 @@
 # utils/highlight_detection/txt_branch.py
-from utils.video_to_summarization import video_to_summarization
+import os, json
 
 def compute_txt_branch(video_path):
     """
     Re-use the existing Gemini summarizer as the TXT branch.
     Returns: list of [start, end] spans.
     """
-    _, _, timestamps = video_to_summarization(video_path)
+    filename = os.path.basename(video_path)
+    video_id = os.path.splitext(filename)[0]
+
+    timestamps = None
+    with open(r"summarized_results.jsonl", "r") as f:
+        for line in f:
+            data = json.loads(line)
+            if data.get("id") == video_id:
+                timestamps = data["result"]["timestamps"]
+                break
+
     return timestamps
 
 def txt_score_per_shot(shots, spans):
