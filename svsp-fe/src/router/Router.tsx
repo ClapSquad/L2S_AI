@@ -1,7 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import MainPage from "@main/MainPage";
-import LoginPage from "@login/LoginPage";
-import RegisterPage from "@register/RegisterPage";
+import LoginPage from "@auth/LoginPage";
+import RegisterPage from "@auth/RegisterPage";
 import MyPage from "@my/MyPage";
 import routePath from "./routePath";
 

@@ -1,4 +1,3 @@
-import routePath from "@router/routePath";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { globalButtonStyle } from "@styles/globalStyle";
