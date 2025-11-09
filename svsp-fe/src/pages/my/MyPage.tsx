@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 import FileUpload from "../../components/FileUpload";
 import { AuthContext } from "src/contexts/AuthContext";
 import { toast } from "react-toastify";
@@ -10,10 +10,15 @@ export default function MyPage() {
   const { user } = useContext(AuthContext);
   const navigateBack = useNavigateBack();
 
+  useEffect(() => {
+    if (!user) {
+      toast.info("로그인이 필요합니다.");
+      navigateBack();
+    }
+  }, [user, navigateBack]);
+
   if (!user) {
-    toast.info("로그인이 필요합니다.");
-    navigateBack();
-    return;
+    return null;
   }
 
   return (
