@@ -18,7 +18,7 @@ export default function NavigationBar() {
         <SettingModal onClose={close} />
       </Modal>
       <NavigationBarWrapper>
-        <Button onClick={() => navigate(routePath.HOME)}>
+        <Button onClick={() => navigate(-1)}>
           <ArrowBackIcon size="30" color="black" />
         </Button>
         <ButtonSet>

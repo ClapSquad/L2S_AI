@@ -1,6 +1,8 @@
 import { useForm } from "react-hook-form";
 import NavigationBar from "./components/NavigationBar";
 import styled from "styled-components";
+import { Link } from "react-router-dom";
+import routePath from "@router/routePath";
 
 interface LoginFormData {
   email: string;
@@ -58,6 +60,7 @@ export default function LoginPage() {
 
           <button type="submit">로그인</button>
         </form>
+        <Link to={routePath.REGISTER}>계정 생성하기</Link>
       </LoginPageWrapper>
     </PageFiller>
   );
