@@ -1,11 +1,11 @@
 import { useForm } from "react-hook-form";
-import NavigationBar from "./components/NavigationBar";
 import styled from "styled-components";
 import { Link } from "react-router-dom";
 import routePath from "@router/routePath";
 import EmailInput from "./components/EmailInput";
 import PasswordInput from "./components/PasswordInput";
 import { useLogin } from "@auth/hooks/useLogin";
+import NavigationBar from "@components/NavigationBar";
 
 interface LoginFormData {
   email: string;

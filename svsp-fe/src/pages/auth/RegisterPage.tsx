@@ -1,11 +1,11 @@
 import { useForm } from "react-hook-form";
 import styled from "styled-components";
-import NavigationBar from "./components/NavigationBar";
 import EmailInput from "./components/EmailInput";
 import PasswordInput from "./components/PasswordInput";
 import ConfirmPasswordInput from "./components/ConfirmPasswordInput";
 import { useRegister } from "@auth/hooks/useRegister";
 import UsernameInput from "./components/UsernameInput";
+import NavigationBar from "@components/NavigationBar";
 
 interface RegisterFormData {
   email: string;

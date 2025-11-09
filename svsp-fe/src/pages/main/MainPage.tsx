@@ -1,7 +1,7 @@
 import styled from "styled-components";
 import a from "./assets/Long2ShortTextHorizontal.png";
 import Logo from "@components/Logo";
-import NavigationBar from "./components/NavigationBar";
+import NavigationBar from "@components/NavigationBar";
 
 export default function MainPage() {
   return (
