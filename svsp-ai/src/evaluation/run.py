@@ -11,11 +11,11 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 # --- End Path setup ---
 
-from utils.highlight_detection.highlight_pipeline import run_echofusion
-from utils.video_to_summarization import video_to_summarization
+from core.highlight_detection.highlight_pipeline import run_echofusion
+from core.summarization.video_to_summarization import video_to_summarization
 
 # Usage
-# python evaluation/run.py -i /path/to/video/folder
+# python src/evaluation/run.py -i /path/to/video/folder
 
 def batch_run_echofusion(video_folder: str):
     """
@@ -44,7 +44,7 @@ def batch_run_echofusion(video_folder: str):
 
                 print("-> Running Echofusion ...")
                 predictions = run_echofusion(
-                    str(video_path),
+                    video_path,
                     summary=summarized_segments or "",
                     llm_timestamps=llm_timestamps
                 )

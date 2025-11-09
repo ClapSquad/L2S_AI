@@ -1,4 +1,4 @@
-import os, json, subprocess, pathlib, cv2
+import json, subprocess, pathlib, cv2
 
 def detect_shots(video_path, init_threshold=27, min_threshold=5, target_min_scenes=5):
     """Detect shots using PySceneDetect (content detector)."""
@@ -79,7 +79,7 @@ def fixed_window_fallback(video_path, window_size=10.0):
         return []
 
 def get_video_duration(video_path):
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(str(video_path), cv2.CAP_ANY)
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     cap.release()

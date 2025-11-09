@@ -1,8 +1,8 @@
 import pathlib, json, yaml
 from .shot_detection import detect_shots
 from .keyframes import extract_keyframes
-from .scoring import compute_hd_branch
-from .txt_branch import txt_score_per_shot
+from .feature_scoring import compute_hd_branch
+from .transcript_scoring import txt_score_per_shot
 from .fusion import fuse_and_select
 
 def run_echofusion(video_path, title="", summary="", llm_timestamps=[], **overrides):
@@ -19,7 +19,7 @@ def run_echofusion(video_path, title="", summary="", llm_timestamps=[], **overri
 
     # Keyframe Extraction
     print("\n--- Step 2: Keyframe Extraction ---")
-    if not pathlib.Path("data/keyframes") / video_path.stem / "shot_0000" .exists():
+    if not (pathlib.Path("data/keyframes") / video_path.stem / "shot_0000").exists():
         print("-> Extracting keyframes ...")    
         extract_keyframes(video_path, shots, fps=cfg["segmentation"]["keyframe_fps"])
     else:
@@ -35,7 +35,7 @@ def run_echofusion(video_path, title="", summary="", llm_timestamps=[], **overri
 
     if not llm_timestamps:
         print("-> No LLM timestamps provided, generating via video_to_summarization ...")
-        from utils.video_to_summarization import video_to_summarization
+        from src.core.summarization.video_to_summarization import video_to_summarization
         _, _, llm_timestamps = video_to_summarization(video_path)
 
     print("-> TXT Branch")
@@ -54,4 +54,5 @@ def run_echofusion(video_path, title="", summary="", llm_timestamps=[], **overri
         max_len=cfg["fusion"]["max_len"],
         merge_gap=cfg["fusion"]["merge_gap"])
     
+    print("-> Done!")
     return predictions

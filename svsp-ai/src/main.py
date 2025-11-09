@@ -1,10 +1,19 @@
+from pathlib import Path
 import uuid
-from utils.video_to_summarization import video_to_summarization
+from core.summarization.video_to_summarization import video_to_summarization
+from core.video_processing.video_processor import cut_video_by_timestamps
+from core.video_processing.video_exporter import export_social_media_vertical_video
+from core.subtitles.subtitles import burn_subtitles, remap_subtitles
+import os, argparse, subprocess, logging, json, sys
+from core.summarization.video_to_summarization import video_to_summarization
+
+# Add the project root to the Python path to allow importing from 'utils'
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+# --- End Path setup ---
+
 from utils.logging_initialization import initialize_logging
-from utils.video_processor import cut_video_by_timestamps
-from utils.video_exporter import export_social_media_vertical_video
-from utils.subtitles import burn_subtitles, remap_subtitles
-import os, argparse, subprocess, logging, json
 
 # Usage
 # python main.py -f <video_file> [options]
@@ -13,7 +22,7 @@ import os, argparse, subprocess, logging, json
 # python main.py -f input.mp4 --method llm --vertical_export
 
 # To run the echofusion method:
-# python main.py -f input.mp4 --method echofusion --title "Example Title"
+# python src/main.py -f input.mp4 --method echofusion --title "Example Title"
 
 def main():
     initialize_logging()
@@ -28,9 +37,9 @@ def main():
     parser.add_argument("--method", choices=["llm", "echofusion"], default="llm",
                         help="Choose summarization/highlight method.")
     parser.add_argument("--title", type=str, default="", help="Optional video title for echofusion.")
-    parser.add_argument("--w_hd", type=float, default=0.45)
-    parser.add_argument("--w_txt", type=float, default=0.35)
-    parser.add_argument("--w_aud", type=float, default=0.20)
+    parser.add_argument("--w_hd", type=float, default=0.55)
+    parser.add_argument("--w_txt", type=float, default=0.45)
+    parser.add_argument("--w_aud", type=float, default=0.00)
     parser.add_argument("--keep_seconds", type=float, default=60.0)
 
     args = parser.parse_args()
@@ -46,9 +55,9 @@ def main():
     if args.method == "llm":
         timestamps = llm_timestamps
     else:
-        from utils.highlight_detection.highlight_pipeline import run_echofusion
+        from src.core.highlight_detection.highlight_pipeline import run_echofusion
         predictions = run_echofusion(
-            video_path,
+            Path(video_path),
             title=args.title or "",
             summary=summarized_segments or "",
             llm_timestamps=llm_timestamps,
@@ -58,6 +67,8 @@ def main():
         timestamps = [[start, end] for start, end, score, rank in predictions]
         json.dump(predictions, open(os.path.join(output_dir, f"{base_filename}_timestamps.json"), "w"), indent=2)
 
+    print(f"\n--- Completed summarization/highlight detection. Generated title: {hook_title} ---")
+    print("Cutting timestamps...")
     # --- Create summarized video ---
     summarized_video_path = os.path.join(output_dir, f"{hook_title}_summary.mp4")
     cut_video_by_timestamps(video_path, timestamps, summarized_video_path)
@@ -83,6 +94,7 @@ def main():
 
     # --- Optional subtitle burn ---
     if args.subtitles:
+        print("\n--- Burning Subtitles ---")
         remapped = remap_subtitles(summarized_segments)
         logging.debug(f"Remapped result => {remapped}")
         out_video = burn_subtitles(
@@ -92,6 +104,8 @@ def main():
             output_dir
         )
         logging.debug(f"Subtitled video generated at {out_video}")
+
+    print(f"\nAll done! Check output folder: {output_dir}")
 
 if __name__ == "__main__":
     main()

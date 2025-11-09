@@ -17,3 +17,5 @@ __pycache__/
 
 # Datasets
 heatmap_dataset.jsonl
+
+*.mp4

@@ -4,7 +4,7 @@ from PIL import Image
 
 # Compute motion score for a video segment
 def motion_score(video_path, start, end, step=0.25):
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(str(video_path), cv2.CAP_ANY)
     cap.set(cv2.CAP_PROP_POS_MSEC, start*1000) # set start time
     ret, prev = cap.read() # read first frame
     if not ret:

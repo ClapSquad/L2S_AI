@@ -1,0 +1,10 @@
+numpy
+opencv-python
+Pillow
+pyyaml
+scenedetect
+torch
+open_clip_torch
+librosa
+openai
+openai-whisper
