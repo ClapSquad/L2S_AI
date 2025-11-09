@@ -32,7 +32,8 @@
       "@router/*": ["src/router/*"],
       "@auth/*": ["src/pages/auth/*"],
       "@main/*": ["src/pages/main/*"],
-      "@my/*": ["src/pages/my/*"]
+      "@my/*": ["src/pages/my/*"],
+      "@apis/*": ["src/apis/*"]
     }
   },
   "include": ["src"]

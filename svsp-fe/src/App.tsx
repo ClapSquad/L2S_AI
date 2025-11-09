@@ -1,13 +1,15 @@
 import Router from "@router/Router";
 import { ToastContainer } from "react-toastify";
-import AuthContextProvider from "./contexts/AuthContext";
+import { useValidateAuth } from "@apis/hooks/useValidateAuth";
 
 function App() {
+  useValidateAuth();
+
   return (
-    <AuthContextProvider>
+    <>
       <Router />
       <ToastContainer />
-    </AuthContextProvider>
+    </>
   );
 }
 

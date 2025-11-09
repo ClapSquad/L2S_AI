@@ -8,7 +8,7 @@ import { axiosInstance } from "src/apis/axiosInstance";
 import { API } from "src/apis/endpoints";
 import { AuthContext } from "src/contexts/AuthContext";
 import queryClient from "src/apis/queryClient";
-import type { UserInfoResponse } from "./useMe";
+import type { UserInfoResponse } from "@apis/hooks/useMe";
 
 interface LoginRequest {
   email: string;

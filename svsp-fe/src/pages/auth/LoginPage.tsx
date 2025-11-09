@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import routePath from "@router/routePath";
 import EmailInput from "./components/EmailInput";
 import PasswordInput from "./components/PasswordInput";
-import { useLogin } from "./hooks/useLogin";
+import { useLogin } from "@auth/hooks/useLogin";
 
 interface LoginFormData {
   email: string;
