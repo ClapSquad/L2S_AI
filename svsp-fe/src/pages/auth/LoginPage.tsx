@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import routePath from "@router/routePath";
 import EmailInput from "./components/EmailInput";
 import PasswordInput from "./components/PasswordInput";
+import { useLogin } from "./hooks/useLogin";
 
 interface LoginFormData {
   email: string;
@@ -18,8 +19,9 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormData>();
 
+  const { mutate } = useLogin();
   const onSubmit = (data: LoginFormData) => {
-    alert(`로그인 시도: ${data.email}`);
+    mutate(data);
   };
 
   return (

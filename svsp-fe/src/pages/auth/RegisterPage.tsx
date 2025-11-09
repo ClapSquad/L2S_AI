@@ -4,9 +4,12 @@ import NavigationBar from "./components/NavigationBar";
 import EmailInput from "./components/EmailInput";
 import PasswordInput from "./components/PasswordInput";
 import ConfirmPasswordInput from "./components/ConfirmPasswordInput";
+import { useRegister } from "./hooks/useRegister";
+import UsernameInput from "./components/UserNameInput";
 
 interface RegisterFormData {
   email: string;
+  username: string;
   password: string;
   confirmPassword: string;
 }
@@ -20,8 +23,13 @@ export default function RegisterPage() {
   } = useForm<RegisterFormData>();
   const password = watch("password");
 
+  const { mutate } = useRegister();
   const onSubmit = (data: RegisterFormData) => {
-    alert(`회원가입 완료: ${data.email}`);
+    mutate({
+      email: data.email,
+      username: data.username,
+      password: data.password,
+    });
   };
 
   return (
@@ -31,6 +39,7 @@ export default function RegisterPage() {
         <h2>회원가입</h2>
         <RegisterForm onSubmit={handleSubmit(onSubmit)}>
           <EmailInput register={register} errors={errors} />
+          <UsernameInput register={register} errors={errors} />
           <PasswordInput register={register} errors={errors} />
           <ConfirmPasswordInput
             register={register}
