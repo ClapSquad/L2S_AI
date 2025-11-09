@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { globalButtonStyle } from "@styles/globalStyle";
 import { SettingsIcon } from "src/icons/SettingsIcon";
@@ -6,9 +5,10 @@ import { useModal } from "@hooks/useModal";
 import { Modal } from "@components/Modal";
 import SettingModal from "@components/SettingModal";
 import { ArrowBackIcon } from "src/icons/ArrowBackIcon";
+import { useNavigateBack } from "@hooks/userNavigateBack";
 
 export default function NavigationBar() {
-  const navigate = useNavigate();
+  const navigateBack = useNavigateBack();
   const { isOpen, open, close } = useModal();
 
   return (
@@ -17,7 +17,7 @@ export default function NavigationBar() {
         <SettingModal onClose={close} />
       </Modal>
       <NavigationBarWrapper>
-        <Button onClick={() => navigate(-1)}>
+        <Button onClick={() => navigateBack()}>
           <ArrowBackIcon size="30" color="black" />
         </Button>
         <ButtonSet>
