@@ -1,13 +1,15 @@
-import NavigationBar from "@components/NavigationBar";
 import Router from "@router/Router";
-import { BrowserRouter } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import { useValidateAuth } from "@apis/hooks/useValidateAuth";
 
 function App() {
+  useValidateAuth();
+
   return (
-    <BrowserRouter>
-      <NavigationBar />
+    <>
       <Router />
-    </BrowserRouter>
+      <ToastContainer />
+    </>
   );
 }
 
