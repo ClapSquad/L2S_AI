@@ -97,19 +97,22 @@ def compute_hd_branch(video_path, shots, title, summary, cfg):
                 speech = 0.0
 
             # CLIP similarity with generic prompts
-            pbar.set_description(f"Shot {sh['shot_id']}: CLIP Similarity")
-            kf_dir = pathlib.Path("data/keyframes") / pathlib.Path(video_path).stem / f"shot_{sh['shot_id']:04d}"
-            sims = []
-            for img_file in kf_dir.glob("*.jpg"):
-                img = preprocess(Image.open(img_file).convert("RGB")).unsqueeze(0).to(device)
-                with torch.no_grad():
-                    img_feat = model.encode_image(img)
-                    img_feat /= img_feat.norm(dim=-1, keepdim=True)
-                    sim = (img_feat @ txt_feats.T).max().item()
-                sims.append(sim)
-            clip_score = max(sims) if sims else 0.0
-            out.append({"shot_id": sh["shot_id"], "start": s, "end": e,
-                        "motion": motion, "clip": clip_score, "loud": loud, "speech": speech})
+            if cfg["weights"]["clip"] <= 0.0:
+                clip_score = 0.0
+            else:
+                pbar.set_description(f"Shot {sh['shot_id']}: CLIP Similarity")
+                kf_dir = pathlib.Path("data/keyframes") / pathlib.Path(video_path).stem / f"shot_{sh['shot_id']:04d}"
+                sims = []
+                for img_file in kf_dir.glob("*.jpg"):
+                    img = preprocess(Image.open(img_file).convert("RGB")).unsqueeze(0).to(device)
+                    with torch.no_grad():
+                        img_feat = model.encode_image(img)
+                        img_feat /= img_feat.norm(dim=-1, keepdim=True)
+                        sim = (img_feat @ txt_feats.T).max().item()
+                    sims.append(sim)
+                clip_score = max(sims) if sims else 0.0
+                out.append({"shot_id": sh["shot_id"], "start": s, "end": e,
+                            "motion": motion, "clip": clip_score, "loud": loud, "speech": speech})
 
     # normalize + combine
     print("Calculating final HD scores ...")

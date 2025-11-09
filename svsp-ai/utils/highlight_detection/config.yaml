@@ -22,9 +22,9 @@ txt_branch:
   llm_temperature: 0.2
 
 fusion:
-  w_hd: 0.45
-  w_txt: 0.35
-  w_aud: 0.20
+  w_hd: 0.55
+  w_txt: 0.45
+  w_aud: 0.00
   keep_seconds: 60.0
   min_len: 2.0
   max_len: 60.0
