@@ -1,0 +1,31 @@
+segmentation:
+  scenedetect_threshold: 27
+  keyframe_fps: 1.0
+
+hd_branch:
+  clip_model: "ViT-B-32"
+  generic_prompts:
+    - "the most exciting moment"
+    - "the key result or goal"
+    - "audience reaction or climax"
+    - "the main takeaway"
+  weights:
+    motion: 0.30
+    clip: 0.30
+    loud: 0.20
+    speech: 0.20
+
+txt_branch:
+  budget_seconds: 90.0
+  min_span_seconds: 2.0
+  merge_gap: 0.75
+  llm_temperature: 0.2
+
+fusion:
+  w_hd: 0.55
+  w_txt: 0.45
+  w_aud: 0.00
+  keep_seconds: 60.0
+  min_len: 2.0
+  max_len: 60.0
+  merge_gap: 1.5

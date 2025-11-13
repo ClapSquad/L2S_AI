@@ -1,6 +1,0 @@
-requests
-faster_whisper
-ffmpeg-python
-python-dotenv
-openai
-google-generativeai

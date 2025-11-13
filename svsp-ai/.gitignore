@@ -14,3 +14,8 @@ __pycache__/
 # Python logger
 *.log
 .env
+
+# Datasets
+heatmap_dataset.jsonl
+
+*.mp4
