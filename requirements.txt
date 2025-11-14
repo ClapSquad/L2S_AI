@@ -4,11 +4,11 @@ ffmpeg-python
 google-generativeai
 librosa
 matplotlib
-numpy
+numpy<2.0.0
 open-clip-torch
 openai
 openai-whisper
-"opencv-python-headless==4.8.1.78"
+opencv-python-headless==4.8.1.78
 Pillow
 python-dotenv
 pyyaml
