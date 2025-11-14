@@ -1,13 +1,19 @@
-requests
+bs4
 faster_whisper
 ffmpeg-python
-python-dotenv
-openai
 google-generativeai
-bs4
-selenium
-webdriver-manager
+librosa
 matplotlib
-"opencv-python-headless==4.8.1.78"
-"scenedetect==0.6.4" --no-deps
+numpy
 open-clip-torch
+openai
+openai-whisper
+"opencv-python-headless==4.8.1.78"
+Pillow
+python-dotenv
+pyyaml
+requests
+scenedetect
+selenium
+torch
+webdriver-manager
