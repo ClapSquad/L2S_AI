@@ -1,23 +1,53 @@
-# Semantic Video Summarization Pipeline
+# Semantic Video Summarization Pipeline - AI
 
 ## About project
 
-This project is about summarizing a long video into short video while preserving its semantic data(contents).
+This sub-folder is ai part of [SVSP](../README.md)
 
-## Folder structure
+## Dataset
 
-- [svsp-ai: Contains code files for ai](./svsp-ai/README.md)
-  - Python
-- [svsp-be: Contains code files for back-end](./svsp-be/README.md)
-  - Python
-- [svsp-fe: Contains code files for front-end](./svsp-fe/README.md)
-  - React + Typescript
+541 Youtube video ids with heatmap data: [link](https://drive.google.com/drive/folders/1R8TQ5G1964mR8PQBy0dRVa1Y58vu0XWh)
 
-## About us
+## How to run
 
-| Profile | Name | Role | GitHub |
-| :--: | :--: | :--: | :--: |
-| <img src="https://avatars.githubusercontent.com/u/65269430?v=4" width="100"> | 박수민 | PM | https://github.com/Moderator11 |
-| <img src="https://avatars.githubusercontent.com/u/150573808?v=4" width="100"> | Gianella | BE / AI | https://github.com/cinmon |
-| <img src="https://avatars.githubusercontent.com/u/114084952?v=4" width="100"> | Farah | FE | https://github.com/hwaraha |
-| <img src="https://avatars.githubusercontent.com/u/231448883?v=4" width="100"> | 김보름 | FE | https://github.com/rrumi0902-lang |
+1. Install required python packages
+```PowerShell
+pip install requests openai-whisper ffmpeg-python
+```
+
+2. Run main.py at svsp/svsp-ai path
+```PowerShell
+python main.py
+```
+
+Current state of code receives video path then prints text of transcription.
+```python
+from utils.video_to_audio import convert_video_to_audio
+from utils.audio_to_text import transcribe_audio
+import logging, shutil, os
+
+logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s',
+                    filename="log.log",
+                    level=logging.DEBUG)
+logging.debug("Logging started.")
+
+
+def main():
+    VIDEO_PATH = "{target video path}" # <- put video path that you want to test
+    CACHE_PATH = "./cache"
+
+    audio_file = convert_video_to_audio(VIDEO_PATH, CACHE_PATH)
+
+    audio_path = os.path.join(CACHE_PATH, audio_file)
+    text = transcribe_audio(audio_path)
+
+    print(text)
+
+    if os.path.exists(CACHE_PATH):
+        shutil.rmtree(CACHE_PATH)
+        logging.debug(f"Removed cache folder: {CACHE_PATH}")
+
+
+if __name__ == '__main__':
+    main()
+```
