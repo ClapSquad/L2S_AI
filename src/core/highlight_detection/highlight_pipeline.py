@@ -36,7 +36,11 @@ def run_echofusion(video_path, title="", summary="", llm_timestamps=[], **overri
     if not llm_timestamps:
         print("-> No LLM timestamps provided, generating via video_to_summarization ...")
         from src.core.summarization.video_to_summarization import video_to_summarization
-        _, _, llm_timestamps = video_to_summarization(video_path)
+        try:
+            _, _, llm_timestamps = video_to_summarization(video_path)
+        except Exception as e:
+            print(f"Error generating LLM timestamps: {e}")
+            llm_timestamps = []
 
     print("-> TXT Branch")
     txt = txt_score_per_shot(shots, llm_timestamps)

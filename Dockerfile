@@ -34,4 +34,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy the rest of the project
 COPY . .
 
-CMD ["bash"]
+# The port the server is expected to run on
+# Note that this does not actually publish the port
+EXPOSE 8080
+
+# Command to run the Uvicorn server
+# It will look for the 'app' object in the 'main.py' file.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]

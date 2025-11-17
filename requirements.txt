@@ -17,3 +17,5 @@ scenedetect
 selenium
 torch
 webdriver-manager
+fastapi
+uvicorn

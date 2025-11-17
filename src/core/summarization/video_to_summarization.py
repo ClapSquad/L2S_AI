@@ -18,7 +18,13 @@ def video_to_summarization(VIDEO_PATH):
         transcribed_segments = transcribe_audio(audio_path)
         if not isinstance(transcribed_segments, list):
              raise Exception(f"Transcription failed: {transcribed_segments}")
+
+        # Validate that transcription produced results
+        if not transcribed_segments:
+            raise Exception("Transcription returned empty results. The audio may contain no speech, be too quiet, or be corrupted.")
+
         logging.debug(f"Transcription result => {transcribed_segments}")
+        logging.info(f"Transcribed {len(transcribed_segments)} segments, total duration: {transcribed_segments[-1][1][1]:.2f}s")
 
         prompt = f"""
             You are a video summarization assistant.
@@ -64,7 +70,18 @@ def video_to_summarization(VIDEO_PATH):
             raise Exception(f"Failed to get valid timestamps from LLM. Response: {summary_json}")
 
         timestamps: List[Tuple[float, float]] = summary_json["timestamps"]
-        logging.info(f"Parsed timestamps for cutting: {timestamps}")
+
+        # Validate that LLM returned meaningful timestamps
+        if not timestamps:
+            raise Exception(
+                "LLM returned empty timestamps. This could mean:\n"
+                "  1. The transcribed content has no meaningful segments\n"
+                "  2. The LLM couldn't identify important content\n"
+                "  3. The video content may be too repetitive or low-quality\n"
+                f"  Transcription preview: {str(transcribed_segments[:3])[:200]}..."
+            )
+
+        logging.info(f"Parsed {len(timestamps)} timestamp ranges for cutting: {timestamps}")
 
         # Extract text for the summarized segments
         summarized_text = " ".join(
