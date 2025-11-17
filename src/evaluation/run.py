@@ -40,7 +40,11 @@ def batch_run_echofusion(video_folder: str):
             try:
                 # [[start, end, score, rank], ...]
                 print("-> Generating LLM timestamps ...")
-                _, summarized_segments, llm_timestamps = video_to_summarization(video_path)
+                try:
+                    _, summarized_segments, llm_timestamps = video_to_summarization(video_path)
+                except Exception as e:
+                    print(f"Error generating LLM timestamps for {video_path.name}: {e}")
+                    summarized_segments, llm_timestamps = "", []    
 
                 print("-> Running Echofusion ...")
                 predictions = run_echofusion(

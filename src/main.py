@@ -5,7 +5,6 @@ from core.video_processing.video_processor import cut_video_by_timestamps
 from core.video_processing.video_exporter import export_social_media_vertical_video
 from core.subtitles.subtitles import burn_subtitles, remap_subtitles
 import os, argparse, subprocess, logging, json, sys
-from core.summarization.video_to_summarization import video_to_summarization
 
 # Add the project root to the Python path to allow importing from 'utils'
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -50,7 +49,11 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     # --- Summarization / Highlight detection ---
-    hook_title, summarized_segments, llm_timestamps = video_to_summarization(video_path)
+    try:
+        hook_title, summarized_segments, llm_timestamps = video_to_summarization(video_path)
+    except Exception as e:
+        logging.error(f"Error in summarization pipeline: {e}")
+        return
 
     if args.method == "llm":
         timestamps = llm_timestamps
