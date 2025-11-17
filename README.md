@@ -248,5 +248,5 @@ Follow these steps to set up and run the project locally.
 
 ```bash
 docker build -t l2s-ai -f Dockerfile . # build the container
-docker run -it --rm -v .:/app l2s-ai # run the container
+docker run -it --rm -v $(pwd):/app -p 8000:8000 l2s-ai # run the container
 ```
