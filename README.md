@@ -4,6 +4,9 @@ This repo contains a modular pipeline designed to automatically analyze video co
 
 ## Table of Contents
 
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
 - [Core Concepts](#core-concepts)
 - [LLM vs EchoFusion](#llm-vs-echofusion)
   - [LLM Method](#llm-method)
@@ -19,9 +22,47 @@ This repo contains a modular pipeline designed to automatically analyze video co
     - [Potential Use Cases](#potential-use-cases-1)
 - [Method Comparison](#method-comparison)
 - [Usage Examples](#usage-examples)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
+
+
+
+## Getting Started
+
+Follow these steps to set up and run the project locally.
+
+### Prerequisites
+
+1. Docker is recommmended. Otherwise, you can use Anaconda or Python environments.
+
+### Installation
+
+1.  Clone the repository:
+2. Create an `.env` file (see `.env.example`)
+3. If using Docker, build the image and run it like this:
+
+Download the base image:
+
+```bash
+docker pull runpod/pytorch:1.0.2-cu1281-torch271-ubuntu2204
+```
+
+To build the container:
+
+```bash
+docker build -t l2s-ai . # build the container
+```
+
+To run the container:
+- If you don't have an NVIDIA GPU, run: 
+
+```bash
+docker run --rm -it -p 8080:8080 --env-file .env -v .:/app l2s-ai # run the container
+```
+
+- If you have NVIDIA GPU, run
+
+```bash
+docker run --gpus all -it --rm -v .:/app -p 8080:8080 --env-file .env l2s-ai # run the container
+```
 
 
 ## Core Concepts
@@ -230,23 +271,4 @@ python src/main.py -f input.mp4 --method llm --vertical_export
 **EchoFusion Method:**
 ```bash
 python src/main.py -f input.mp4 --method echofusion --title "Video Title" --w_hd 0.6 --w_txt 0.4 --keep_seconds 90
-```
-
-## Getting Started
-
-Follow these steps to set up and run the project locally.
-
-### Prerequisites
-
-1. Docker is recommmended. Otherwise, you can use Anaconda or Python environments.
-
-### Installation
-
-1.  Clone the repository:
-2. Create an `.env` file (see `.env.example`)
-3. If using Docker, build the image and run it like this:
-
-```bash
-docker build -t l2s-ai -f Dockerfile . # build the container
-docker run -it --rm -v .:/app -p 8080:8080 l2s-ai # run the container
 ```

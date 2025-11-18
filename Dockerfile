@@ -1,43 +1,34 @@
-# Stage 1: Build the dependencies
-FROM python:3.11-slim AS builder
+# --- Light CUDA Runtime Image ---
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 # Set working directory
 WORKDIR /app
 
-# Create and activate a virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy requirements first for better caching
-COPY requirements.txt .
-
-# Install Python dependencies into the virtual environment
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Stage 2: Create the final image
-FROM python:3.11-slim
-
-# Set working directory
-WORKDIR /app
-
-# Install runtime system dependencies (ffmpeg is needed)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies
+# Use --allow-releaseinfo-change-suite to handle NVIDIA repo issues
+RUN apt-get update --allow-releaseinfo-change || apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
     ffmpeg \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the virtual environment from the builder stage
-COPY --from=builder /opt/venv /opt/venv
+# Upgrade pip
+RUN python3 -m pip install --upgrade pip
 
-# Activate the virtual environment
-ENV PATH="/opt/venv/bin:$PATH"
+# --- Install GPU PyTorch (CUDA 12.1 compatible) ---
+RUN pip install --no-cache-dir torch==2.1.0 --index-url https://download.pytorch.org/whl/cu121
 
-# Copy the rest of the project
+# Copy requirements and install Python packages
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY . .
 
-# The port the server is expected to run on
-# Note that this does not actually publish the port
+# Expose port
 EXPOSE 8080
 
-# Command to run the Uvicorn server
-# It will look for the 'app' object in the 'main.py' file.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+# Start server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
