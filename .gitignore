@@ -19,3 +19,7 @@ __pycache__/
 heatmap_dataset.jsonl
 
 *.mp4
+*.webm
+*jpg
+assets/
+data/
