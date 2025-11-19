@@ -70,14 +70,17 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
+    # Configure basic logging to show messages when running the script directly
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+
     # Call to the the transcription function
     text = transcribe_audio(args.audio_file, args.model)
 
-    # Print the result
-    print("\n--- Transcription Result ---")
+    # Log the result
+    logging.info("\n--- Transcription Result ---")
     if isinstance(text, list):
         for segment in text:
-            print(segment)
+            logging.info(segment)
     else:
-        print(text) # Print error message
-    print("--------------------------")
+        logging.error(text) # Log error message
+    logging.info("--------------------------")

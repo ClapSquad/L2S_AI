@@ -52,7 +52,6 @@ try:
 except ImportError:
     VERTEXAI_AVAILABLE = False
 
-
 # OpenAI ChatGPT 호출
 def call_openai(api_key: str, model: str, prompt: str,
                 temperature: float = 0.7,
@@ -176,7 +175,11 @@ def call_gemini(model: str, prompt: str, as_json: bool = False):
 
     api_key = os.environ.get('GOOGLE_API_KEY')
     if not api_key:
+        logging.error("GOOGLE_API_KEY environment variable not found.")
         raise RuntimeError('GOOGLE_API_KEY 환경변수 필요')
+
+    # Add this log to debug the key being passed.
+    logging.info(f"Found Google API Key. Starts with: '{api_key[:2]}', Ends with: '{api_key[-2:]}'")
 
     logging.info(f"Calling Gemini model: {model}")
     genai.configure(api_key=api_key)
@@ -188,7 +191,7 @@ def call_gemini(model: str, prompt: str, as_json: bool = False):
         # The model is then constrained to only output valid JSON.
         generation_config = genai.types.GenerationConfig(response_mime_type="application/json")
 
-    logging.info(f"Sending prompt to Gemini model: {model}")
+    logging.info(f"Sending prompt to Gemini model: {prompt}")
     response = gemini_model.generate_content(prompt, generation_config=generation_config)
     text = response.text
     logging.info(f"Received response from Gemini model: {text[:100]}...")
