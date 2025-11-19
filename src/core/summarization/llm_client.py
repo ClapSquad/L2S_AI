@@ -25,7 +25,6 @@ import argparse
 import random
 import time
 import logging
-import typing
 
 try:
     # .env 파일에서 환경 변수를 로드합니다.
@@ -52,16 +51,6 @@ try:
     VERTEXAI_AVAILABLE = True
 except ImportError:
     VERTEXAI_AVAILABLE = False
-
-class HighlightSegment(typing.TypedDict):
-    start_time: str
-    end_time: str
-    summary: str
-    relevance_score: int
-
-class VideoSummary(typing.TypedDict):
-    timestamps: list[HighlightSegment]
-    overall_summary: str
 
 # OpenAI ChatGPT 호출
 def call_openai(api_key: str, model: str, prompt: str,
