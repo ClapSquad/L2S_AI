@@ -59,7 +59,7 @@ def video_to_summarization(VIDEO_PATH):
             OK (empty) → {{ "timestamps": [] }}
 
             Transcribed Segments:
-            {{transcribed_segments}}
+            {transcribed_segments}
         """
         print("-> Generating summarization timestamps via LLM ...")
         summarization_result = call_gemini("gemini-2.5-flash", prompt, as_json=True)
