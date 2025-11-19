@@ -4,24 +4,27 @@ This repo contains a modular pipeline designed to automatically analyze video co
 
 ## Table of Contents
 
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-- [Core Concepts](#core-concepts)
-- [LLM vs EchoFusion](#llm-vs-echofusion)
-  - [LLM Method](#llm-method)
-    - [Pipeline Flow](#pipeline-flow)
-    - [Detailed Steps](#detailed-steps)
-    - [Key Features](#key-features)
-    - [Potential Use Cases](#potential-use-cases)
-  - [EchoFusion Method](#echofusion-method)
-    - [Pipeline Flow](#pipeline-flow-1)
-    - [Detailed Steps](#detailed-steps-1)
-    - [Configurable Parameters](#configurable-parameters)
-    - [Key Features](#key-features-1)
-    - [Potential Use Cases](#potential-use-cases-1)
-- [Method Comparison](#method-comparison)
-- [Usage Examples](#usage-examples)
+- [L2S: Long2Short Video Sumammarization](#l2s-long2short-video-sumammarization)
+  - [Table of Contents](#table-of-contents)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+  - [Core Concepts](#core-concepts)
+    - [LLM vs EchoFusion](#llm-vs-echofusion)
+      - [LLM Method](#llm-method)
+        - [Pipeline Flow](#pipeline-flow)
+        - [Detailed Steps](#detailed-steps)
+        - [Key Features](#key-features)
+        - [Potential Use Cases](#potential-use-cases)
+      - [EchoFusion Method](#echofusion-method)
+        - [Pipeline Flow](#pipeline-flow-1)
+        - [Detailed Steps](#detailed-steps-1)
+        - [Configurable Parameters](#configurable-parameters)
+        - [Key Features](#key-features-1)
+        - [Potential Use Cases](#potential-use-cases-1)
+    - [Method Comparison](#method-comparison)
+    - [Usage Examples](#usage-examples)
+  - [Log Warning Meanings](#log-warning-meanings)
 
 
 
@@ -38,12 +41,6 @@ Follow these steps to set up and run the project locally.
 1.  Clone the repository:
 2. Create an `.env` file (see `.env.example`)
 3. If using Docker, build the image and run it like this:
-
-Download the base image:
-
-```bash
-docker pull runpod/pytorch:1.0.2-cu1281-torch271-ubuntu2204
-```
 
 To build the container:
 
@@ -272,3 +269,23 @@ python src/main.py -f input.mp4 --method llm --vertical_export
 ```bash
 python src/main.py -f input.mp4 --method echofusion --title "Video Title" --w_hd 0.6 --w_txt 0.4 --keep_seconds 90
 ```
+
+## Log Warning Meanings
+
+You may get the following messages in the logs:
+
+```
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+```
+
+As it suggests, it indicates that any log message that is written before the `InitializeLog` will be output in the console instead of the log file.
+
+```
+E0000 00:00:1763535189.463905   31781 alts_credentials.cc:93] ALTS creds ignored. Not running on GCP and untrusted ALTS is not enabled.
+```
+
+This one is harmless. It appears when we are using Google Cloud services (like their AI models) from our local computer instead of from inside Google's cloud servers. It basically means:
+- `ALTS ignored`: ALTS means "Application Layer Transport Security". It's a special security system that Google uses inside their data centers.
+- `Not running on GCP`: GCP is Google Cloud Platform. Our code is running on our local computer and not on Google's servers.
+
+So it basically says that we are not on Google servers, so it skips the security layer and uses regular internet security instead.
