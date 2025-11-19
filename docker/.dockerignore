@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+*.env
+
+# System caches
+.cache/
+*.cache/
+
+# Model downloads / HuggingFace
+/.huggingface/
+huggingface/
+models/
+checkpoints/
+*.bin
+*.pt
+*.pth
+
+# Docker
+Dockerfile
+docker-compose.*
+*.tar
+
+# Git
+.git/
+.gitignore
+
+# Node
+node_modules/
+
+# OS trash
+.DS_Store
+Thumbs.db
+
+# Data files
+assets/
+cache/
+data/
+videos/
+outputs/
+assets/
+*.mp4
+*.webm
+README.md
+
+# IDE
+.idea
