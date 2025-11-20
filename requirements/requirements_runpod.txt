@@ -1,0 +1,33 @@
+# Core dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# AI/ML
+torch==2.1.0
+faster-whisper==0.10.0
+open-clip-torch==2.20.0
+librosa==0.10.1
+numpy<2.0.0
+
+# Video processing
+ffmpeg-python==0.2.0
+opencv-python-headless==4.8.1.78
+scenedetect==0.6.2
+Pillow==10.1.0
+
+# Cloud services
+runpod==1.5.1
+supabase==2.3.0
+
+# Utilities
+requests==2.31.0
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# LLM integration
+google-generativeai==0.3.1
+openai==1.3.5
+
+# Monitoring (optional)
+sentry-sdk==1.38.0
