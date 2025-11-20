@@ -65,7 +65,7 @@ class VideoProcessor:
         if self.clip_model is not None:
             return self.clip_model
             
-        logger.info("🖼️  Loading CLIP...")
+        logger.info("Loading CLIP...")
         import open_clip
         import torch
         
@@ -79,12 +79,12 @@ class VideoProcessor:
         )
         
         self.clip_model = self.clip_model.cuda()
-        logger.info("✅ CLIP loaded!")
+        logger.info("CLIP loaded!")
         return self.clip_model, self.clip_preprocess
     
     def download_video(self, url: str) -> Path:
         """Download video from Supabase URL"""
-        logger.info(f"⬇️  Downloading video from {url}")
+        logger.info(f"Downloading video from {url}")
         
         # Create temp file
         temp_file = Path(tempfile.mktemp(suffix=".mp4"))
