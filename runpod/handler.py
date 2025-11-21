@@ -4,20 +4,31 @@ This is the main entry point that RunPod calls to process videos
 """
 
 import runpod
-import os
+import sys
 import logging
 from pathlib import Path
+
+# Add the project root to the Python path
+project_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root))
+
+import os
 import tempfile
 import requests
-from typing import Dict, Any
 import time
 
-# Configure logging
+# Configure logging to be more robust
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=LOG_LEVEL,
+    format='%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s',
+    stream=sys.stdout,
 )
 logger = logging.getLogger(__name__)
+
+# Silence overly verbose loggers from libraries
+logging.getLogger("open_clip").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
 
 # Model cache directory (RunPod Network Volume)
 MODEL_DIR = Path(os.getenv("MODEL_CACHE_DIR", "/runpod-volume/models"))
@@ -102,7 +113,9 @@ class VideoProcessor:
         from supabase import create_client
         
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+        logging.info(f"DEBUG: SUPABASE_URL={supabase_url}, SUPABASE_KEY={'set' if supabase_key else 'not set'}  ")
         
         if not supabase_url or not supabase_key:
             raise ValueError("Supabase credentials not configured")
@@ -147,64 +160,77 @@ class VideoProcessor:
         logger.info(f"✅ Transcribed {len(transcription)} segments")
         return transcription
     
-    def extract_highlights(self, video_path: Path, transcription: list) -> list:
+    def extract_highlights(self, video_path: Path, transcription: list, options: dict) -> list:
         """Extract video highlights using CLIP and transcription"""
         logger.info("🎬 Extracting highlights...")
-
-        from src.video_processing import (
-            extract_frames_from_video,
-            get_text_features,
-            get_video_features,
-            find_best_matching_frames,
-        )
-
-        # Ensure models are loaded
-        clip_model, clip_preprocess = self.load_clip()
-
-        # Extract frames from the video
-        frames_dir = Path(tempfile.mkdtemp())
-        frames = extract_frames_from_video(str(video_path), output_folder=str(frames_dir))
-
-        if not frames:
-            logger.warning("No frames extracted from video.")
+        
+        from src.core.highlight_detection.shot_detection import detect_shots
+        from src.core.highlight_detection.keyframes import extract_keyframes
+        from src.core.highlight_detection.feature_scoring import compute_hd_branch
+        
+        # 1. Detect shots in the video
+        shots = detect_shots(str(video_path))
+        if not shots:
+            logger.warning("No shots detected in the video.")
             return []
-
-        # Get features
-        text_features = get_text_features(
-            [segment["text"] for segment in transcription], clip_model
+        
+        # 2. Extract keyframes from each shot
+        extract_keyframes(str(video_path), shots)
+        
+        # 3. Compute scores for each shot
+        # This configuration is required by compute_hd_branch
+        # In a real scenario, this would come from a config file.
+        highlight_config = {
+            "clip_model": "ViT-B-32",
+            "generic_prompts": [
+                "a person speaking", "a person gesturing", "an interesting object",
+                "a dynamic scene", "a close-up shot", "a wide shot"
+            ],
+            "weights": {
+                "motion": 1.0,
+                "clip": 1.5,
+                "loud": 0.8,
+                "speech": 0.5
+            }
+        }
+        
+        # The `compute_hd_branch` function from your project already handles
+        # loading the CLIP model, getting text/video features, and scoring.
+        scored_shots = compute_hd_branch(
+            video_path=str(video_path),
+            shots=shots,
+            title="", # Title and summary are not used in the handler context
+            summary="",
+            cfg=highlight_config
         )
-        video_features = get_video_features(
-            frames, clip_preprocess, clip_model, device=self.device
-        )
-
-        # Find best matching frames for each transcription segment
-        highlights = find_best_matching_frames(
-            transcription, text_features, video_features, frames
-        )
-
+        
+        # 4. Select the top N shots as highlights
+        highlights_count = options.get('highlights_count', 5)
+        scored_shots.sort(key=lambda x: x.get("HD", 0), reverse=True)
+        
+        highlights = scored_shots[:highlights_count]
+        
         logger.info(f"✅ Found {len(highlights)} highlights")
         return highlights
 
     def create_summary_video(self, video_path: Path, highlights: list, output_path: Path):
         """Create summary video from highlights"""
         logger.info("✂️  Creating summary video...")
-        
-        import ffmpeg
-        
-        # Placeholder: This logic needs to be implemented.
+
         if not highlights:
             logger.warning("No highlights provided to create a summary video.")
             return None
 
-        clips = []
-        video_stream = ffmpeg.input(str(video_path))
+        # Import the robust video cutting function from your project
+        from src.core.video_processing.video_processor import cut_video_by_timestamps
 
-        for highlight in highlights:
-            start_time = highlight["start"]
-            end_time = highlight["end"]
-            clips.append(video_stream.trim(start=start_time, end=end_time).setpts('PTS-STARTPTS'))
+        # Prepare timestamps in the format required by cut_video_by_timestamps: [(start, end), ...]
+        timestamps = [(h["start"], h["end"]) for h in highlights]
 
-        (ffmpeg.concat(*clips, v=1, a=1).output(str(output_path)).run(overwrite_output=True, quiet=True))
+        # Use the existing function to cut and concatenate the video
+        cut_video_by_timestamps(
+            video_path=str(video_path), timestamps=timestamps, output_path=str(output_path)
+        )
 
         logger.info(f"✅ Summary created: {output_path}")
         return output_path
@@ -251,7 +277,7 @@ def process_video(job):
         )
         
         # Step 3: Extract highlights (Dummy implementation for now)
-        highlights = processor.extract_highlights(video_path, transcription)
+        highlights = processor.extract_highlights(video_path, transcription, options)
         
         # Step 4: Create summary (Dummy implementation for now)
         output_path = Path(tempfile.mktemp(suffix=".mp4"))

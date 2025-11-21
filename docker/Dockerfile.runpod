@@ -5,7 +5,7 @@
 # ============================================
 
 # ============ STAGE 1: BUILDER ============
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS builder
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS builder
 
 WORKDIR /build
 
@@ -41,11 +41,11 @@ RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cu121
 
 # Copy requirements and install all Python packages
-COPY requirements/requirements_runpod.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+RUN pip install --no-cache-dir -r requirements/requirements_runpod.txt
 
 # ============ STAGE 2: RUNTIME ============
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
 
 WORKDIR /app
 
