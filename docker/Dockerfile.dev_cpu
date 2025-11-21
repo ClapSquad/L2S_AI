@@ -1,5 +1,7 @@
+# This is a multi-stage Dockerfile for a development (CPU-ONLY) environment
+
 # Stage 1: Build the dependencies
-FROM python:3.11-slim AS builder
+FROM python:3.10-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -9,13 +11,13 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY requirements/requirements_dev.txt requirements.txt
 
 # Install Python dependencies into the virtual environment
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Create the final image
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 # Set working directory
 WORKDIR /app
@@ -40,4 +42,4 @@ EXPOSE 8080
 
 # Command to run the Uvicorn server
 # It will look for the 'app' object in the 'main.py' file.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
