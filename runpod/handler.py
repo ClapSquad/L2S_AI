@@ -33,7 +33,8 @@ class VideoProcessor:
     def __init__(self):
         self.whisper_model = None
         self.clip_model = None
-        self.device = "cuda"
+        self.device = "cuda" if os.getenv("USE_GPU", "1") == "1" else "cpu"
+        logger.info(f"Initializing VideoProcessor on device: {self.device}")
         
     def load_whisper(self, model_size="medium"):
         """Load Whisper model (cached in network volume)"""
@@ -43,17 +44,13 @@ class VideoProcessor:
         logger.info(f"Loading Whisper {model_size}...")
         from faster_whisper import WhisperModel
         
-        model_path = MODEL_DIR / f"whisper-{model_size}"
-        
-        if model_path.exists():
-            logger.info(f"✅ Using cached model from {model_path}")
-        else:
-            logger.info(f"⬇️  Downloading model to {model_path}...")
-            
+        # faster-whisper handles caching via the download_root parameter.
+        # The library will download the model to the specified directory if it's not already there.
+        compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "float16")
         self.whisper_model = WhisperModel(
             model_size,
             device=self.device,
-            compute_type="float16",
+            compute_type=compute_type,
             download_root=str(MODEL_DIR)
         )
         
@@ -131,7 +128,7 @@ class VideoProcessor:
         """Transcribe audio using Whisper"""
         logger.info(f"🎤 Transcribing {video_path}...")
         
-        whisper = self.load_whisper("medium")
+        whisper = self.load_whisper(os.getenv("WHISPER_MODEL_SIZE", "medium"))
         
         segments, info = whisper.transcribe(
             str(video_path),
@@ -153,30 +150,62 @@ class VideoProcessor:
     def extract_highlights(self, video_path: Path, transcription: list) -> list:
         """Extract video highlights using CLIP and transcription"""
         logger.info("🎬 Extracting highlights...")
-        
-        # TODO: Implement your highlight extraction logic
-        # This is a placeholder
-        
-        highlights = [
-            {"start": 0, "end": 10, "score": 0.9},
-            {"start": 30, "end": 40, "score": 0.85},
-        ]
-        
+
+        from src.video_processing import (
+            extract_frames_from_video,
+            get_text_features,
+            get_video_features,
+            find_best_matching_frames,
+        )
+
+        # Ensure models are loaded
+        clip_model, clip_preprocess = self.load_clip()
+
+        # Extract frames from the video
+        frames_dir = Path(tempfile.mkdtemp())
+        frames = extract_frames_from_video(str(video_path), output_folder=str(frames_dir))
+
+        if not frames:
+            logger.warning("No frames extracted from video.")
+            return []
+
+        # Get features
+        text_features = get_text_features(
+            [segment["text"] for segment in transcription], clip_model
+        )
+        video_features = get_video_features(
+            frames, clip_preprocess, clip_model, device=self.device
+        )
+
+        # Find best matching frames for each transcription segment
+        highlights = find_best_matching_frames(
+            transcription, text_features, video_features, frames
+        )
+
         logger.info(f"✅ Found {len(highlights)} highlights")
         return highlights
-    
+
     def create_summary_video(self, video_path: Path, highlights: list, output_path: Path):
         """Create summary video from highlights"""
         logger.info("✂️  Creating summary video...")
         
         import ffmpeg
         
-        # TODO: Implement your video editing logic using FFmpeg
-        # This is a placeholder
-        
-        # Example: Concatenate highlight clips
-        # ffmpeg.concat(...).output(str(output_path)).run()
-        
+        # Placeholder: This logic needs to be implemented.
+        if not highlights:
+            logger.warning("No highlights provided to create a summary video.")
+            return None
+
+        clips = []
+        video_stream = ffmpeg.input(str(video_path))
+
+        for highlight in highlights:
+            start_time = highlight["start"]
+            end_time = highlight["end"]
+            clips.append(video_stream.trim(start=start_time, end=end_time).setpts('PTS-STARTPTS'))
+
+        (ffmpeg.concat(*clips, v=1, a=1).output(str(output_path)).run(overwrite_output=True, quiet=True))
+
         logger.info(f"✅ Summary created: {output_path}")
         return output_path
 
@@ -185,34 +214,34 @@ class VideoProcessor:
 processor = VideoProcessor()
 
 
-def process_video(job_input: Dict[str, Any]) -> Dict[str, Any]:
+def process_video(job):
     """
-    Main processing function called by RunPod
-    
-    Expected input:
-    {
-        "video_url": "https://supabase.co/.../video.mp4",
-        "job_id": "12345",
-        "options": {
-            "language": "en",
-            "duration": 60,
-            "highlights_count": 5
-        },
-        "webhook_url": "https://your-backend.com/api/runpod-webhook"
-    }
+    Main processing function called by RunPod.
+    Argument is the entire job object: {"id": "...", "input": {...}}
     """
+    # 1. Initialize variables at the very top so the 'except' block can access them
+    job_input = job.get("input", {})
+    webhook_url = None
+    job_id = None
+
     try:
-        logger.info("=" * 50)
-        logger.info("Starting video processing...")
-        logger.info(f"Job ID: {job_input.get('job_id')}")
-        
-        # Extract inputs
-        video_url = job_input['video_url']
-        job_id = job_input['job_id']
-        options = job_input.get('options', {})
+        # 2. Safely extract job_id and webhook_url first
+        job_id = job_input.get('job_id', job.get('id')) # Fallback to RunPod ID if not in input
         webhook_url = job_input.get('webhook_url')
+
+        logger.info("=" * 50)
+        logger.info(f"Starting video processing for Job ID: {job_id}")
         
-        # Step 1: Download video from Supabase
+        # 3. Check for required video_url AFTER extracting the basics
+        video_url = job_input.get('video_url')
+        if not video_url:
+            raise ValueError("Missing 'video_url' in input payload")
+
+        options = job_input.get('options', {})
+        
+        # --- Processing Steps ---
+        
+        # Step 1: Download
         video_path = processor.download_video(video_url)
         
         # Step 2: Transcribe
@@ -221,21 +250,21 @@ def process_video(job_input: Dict[str, Any]) -> Dict[str, Any]:
             language=options.get('language', 'auto')
         )
         
-        # Step 3: Extract highlights
+        # Step 3: Extract highlights (Dummy implementation for now)
         highlights = processor.extract_highlights(video_path, transcription)
         
-        # Step 4: Create summary video
+        # Step 4: Create summary (Dummy implementation for now)
         output_path = Path(tempfile.mktemp(suffix=".mp4"))
         processor.create_summary_video(video_path, highlights, output_path)
         
-        # Step 5: Upload results to Supabase
+        # Step 5: Upload results
         result_url = processor.upload_to_supabase(
             output_path,
             bucket="outputs",
             destination=f"{job_id}/summary.mp4"
         )
         
-        # Step 6: Send webhook to your backend
+        # Step 6: Send success webhook
         if webhook_url:
             logger.info(f"Sending webhook to {webhook_url}")
             requests.post(webhook_url, json={
@@ -247,31 +276,33 @@ def process_video(job_input: Dict[str, Any]) -> Dict[str, Any]:
             })
         
         # Cleanup
-        video_path.unlink(missing_ok=True)
-        output_path.unlink(missing_ok=True)
+        if video_path.exists(): video_path.unlink()
+        if output_path.exists(): output_path.unlink()
         
         logger.info("✅ Processing complete!")
-        logger.info("=" * 50)
-        
         return {
             "status": "success",
             "job_id": job_id,
             "result_url": result_url,
-            "transcription": transcription[:5],  # First 5 segments
+            "transcription": transcription[:5], 
             "highlights_count": len(highlights)
         }
         
     except Exception as e:
-        logger.error(f"❌ Error processing video: {e}", exc_info=True)
+        logger.error(f"❌ Error processing job {job_id}: {e}", exc_info=True)
         
-        # Send error webhook
+        # Send error webhook (Only if we successfully parsed the URL)
         if webhook_url:
-            requests.post(webhook_url, json={
-                "job_id": job_id,
-                "status": "failed",
-                "error": str(e)
-            })
+            try:
+                requests.post(webhook_url, json={
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error": str(e)
+                })
+            except Exception as webhook_err:
+                logger.error(f"Failed to send error webhook: {webhook_err}")
         
+        # Return error to RunPod
         return {
             "status": "error",
             "error": str(e)
