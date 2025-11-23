@@ -16,6 +16,7 @@ import os
 import tempfile
 import requests
 import time
+import yaml
 
 # Configure logging to be more robust
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -46,6 +47,7 @@ class VideoProcessor:
         self.clip_model = None
         self.device = "cuda" if os.getenv("USE_GPU", "1") == "1" else "cpu"
         logger.info(f"Initializing VideoProcessor on device: {self.device}")
+        self._load_config()
         
     def load_whisper(self, model_size="medium"):
         """Load Whisper model (cached in network volume)"""
@@ -89,6 +91,14 @@ class VideoProcessor:
         self.clip_model = self.clip_model.cuda()
         logger.info("CLIP loaded!")
         return self.clip_model, self.clip_preprocess
+
+    def _load_config(self):
+        """Load the main config.yaml file"""
+        config_path = "src/core/highlight_detection/config.yaml"
+        logger.info(f"Loading configuration from {config_path}")
+        with open(config_path, 'r') as f:
+            self.config = yaml.safe_load(f)
+        logger.info("Configuration loaded.")
     
     def download_video(self, url: str) -> Path:
         """Download video from Supabase URL"""
@@ -177,23 +187,7 @@ class VideoProcessor:
         # 2. Extract keyframes from each shot
         extract_keyframes(str(video_path), shots)
         
-        # 3. Compute scores for each shot
-        # This configuration is required by compute_hd_branch
-        # In a real scenario, this would come from a config file.
-        highlight_config = {
-            "clip_model": "ViT-B-32",
-            "generic_prompts": [
-                "a person speaking", "a person gesturing", "an interesting object",
-                "a dynamic scene", "a close-up shot", "a wide shot"
-            ],
-            "weights": {
-                "motion": 1.0,
-                "clip": 1.5,
-                "loud": 0.8,
-                "speech": 0.5
-            }
-        }
-        
+        # 3. Use the loaded config for the HD branch
         # The `compute_hd_branch` function from your project already handles
         # loading the CLIP model, getting text/video features, and scoring.
         scored_shots = compute_hd_branch(
@@ -201,7 +195,7 @@ class VideoProcessor:
             shots=shots,
             title="", # Title and summary are not used in the handler context
             summary="",
-            cfg=highlight_config
+            cfg=self.config['hd_branch']
         )
         
         # 4. Select the top N shots as highlights
