@@ -147,65 +147,84 @@ class VideoProcessor:
         logger.info(f"✅ Uploaded: {public_url}")
         return public_url
     
-    def transcribe_video(self, video_path: Path, language: str = "auto") -> list:
-        """Transcribe audio using Whisper"""
-        logger.info(f"🎤 Transcribing {video_path}...")
+    def transcribe_video(self, video_path: Path, language: str = "auto", model_size: str = "base") -> list:
+        """
+        Extracts audio from a video, transcribes it using Whisper, and returns
+        the transcription with timestamps.
+        """
+        logger.info(f"🎤 Transcribing {video_path} using '{model_size}' model...")
+        from src.core.video_processing.video_to_audio import convert_video_to_audio
+        from src.core.audio_processing.audio_to_text import transcribe_audio
         
-        whisper = self.load_whisper(os.getenv("WHISPER_MODEL_SIZE", "medium"))
-        
-        segments, info = whisper.transcribe(
-            str(video_path),
-            language=None if language == "auto" else language,
-            beam_size=5
+        temp_dir = Path(tempfile.mkdtemp())
+        audio_file_name = None
+
+        try:
+            # 1. Convert video to audio 
+            audio_file_name = convert_video_to_audio(str(video_path), str(temp_dir))
+            if not audio_file_name:
+                raise RuntimeError("Audio conversion failed, convert_video_to_audio returned None.")
+            
+            audio_path = temp_dir / audio_file_name
+
+            # 2. Transcribe the audio file 
+            transcribed_segments = transcribe_audio(str(audio_path), model_name=model_size)
+            if not isinstance(transcribed_segments, list):
+                raise RuntimeError(f"Transcription failed: {transcribed_segments}")
+
+            # 3. Format the output to match the handler's expected format
+            transcription = [
+                {"start": start, "end": end, "text": text}
+                for text, (start, end) in transcribed_segments
+            ]
+
+            logger.info(f"✅ Transcribed {len(transcription)} segments")
+            return transcription
+        finally:
+            # 4. Clean up the temporary directory and its contents
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            logger.info(f"Cleaned up temporary directory: {temp_dir}")
+
+    def extract_highlights_echofusion(self, video_path: Path, llm_timestamps: list, summarized_segments: str, options: dict) -> list:
+        """Extract video highlights using the full EchoFusion pipeline."""
+        logger.info("🎬 Extracting highlights with EchoFusion...")
+        from src.core.highlight_detection.highlight_pipeline import run_echofusion
+
+        # Extract relevant options for echofusion, with defaults from config
+        fusion_cfg = self.config.get("fusion", {})
+        w_hd = options.get("w_hd", fusion_cfg.get("w_hd", 0.55))
+        w_txt = options.get("w_txt", fusion_cfg.get("w_txt", 0.45))
+        w_aud = options.get("w_aud", fusion_cfg.get("w_aud", 0.0))
+        keep_seconds = options.get("keep_seconds", fusion_cfg.get("keep_seconds", 60.0))
+
+        predictions = run_echofusion(
+            video_path=video_path,
+            title=options.get("title", ""),
+            summary=summarized_segments,
+            llm_timestamps=llm_timestamps,
+            w_hd=w_hd,
+            w_txt=w_txt,
+            w_aud=w_aud,
+            keep_seconds=keep_seconds
         )
-        
-        transcription = []
-        for segment in segments:
-            transcription.append({
-                "start": segment.start,
-                "end": segment.end,
-                "text": segment.text
-            })
-        
-        logger.info(f"✅ Transcribed {len(transcription)} segments")
-        return transcription
-    
-    def extract_highlights(self, video_path: Path, transcription: list, options: dict) -> list:
-        """Extract video highlights using CLIP and transcription"""
-        logger.info("🎬 Extracting highlights...")
-        
-        from src.core.highlight_detection.shot_detection import detect_shots
-        from src.core.highlight_detection.keyframes import extract_keyframes
-        from src.core.highlight_detection.feature_scoring import compute_hd_branch
-        
-        # 1. Detect shots in the video
-        shots = detect_shots(str(video_path))
-        if not shots:
-            logger.warning("No shots detected in the video.")
-            return []
-        
-        # 2. Extract keyframes from each shot
-        extract_keyframes(str(video_path), shots)
-        
-        # 3. Use the loaded config for the HD branch
-        # The `compute_hd_branch` function from your project already handles
-        # loading the CLIP model, getting text/video features, and scoring.
-        scored_shots = compute_hd_branch(
-            video_path=str(video_path),
-            shots=shots,
-            title="", # Title and summary are not used in the handler context
-            summary="",
-            cfg=self.config['hd_branch']
-        )
-        
-        # 4. Select the top N shots as highlights
-        highlights_count = options.get('highlights_count', 5)
-        scored_shots.sort(key=lambda x: x.get("HD", 0), reverse=True)
-        
-        highlights = scored_shots[:highlights_count]
-        
-        logger.info(f"✅ Found {len(highlights)} highlights")
+
+        # The handler expects a list of dicts with 'start' and 'end' keys
+        highlights = [{"start": start, "end": end, "score": score} for start, end, score, rank in predictions]
+        logger.info(f"✅ Found {len(highlights)} highlights via EchoFusion")
         return highlights
+
+    def get_summarization_from_video(self, video_path: Path):
+        """Runs the initial summarization to get title, summary, and timestamps."""
+        logger.info("Initial summarization to get title, summary, and timestamps...")
+        from src.core.summarization.video_to_summarization import video_to_summarization
+        try:
+            hook_title, summarized_segments, llm_timestamps = video_to_summarization(video_path)
+            logger.info("✅ Initial summarization complete.")
+            return hook_title, summarized_segments, llm_timestamps
+        except Exception as e:
+            logger.error(f"Error in summarization pipeline: {e}", exc_info=True)
+            return None, None, []
 
     def create_summary_video(self, video_path: Path, highlights: list, output_path: Path):
         """Create summary video from highlights"""
@@ -221,7 +240,7 @@ class VideoProcessor:
         # Prepare timestamps in the format required by cut_video_by_timestamps: [(start, end), ...]
         timestamps = [(h["start"], h["end"]) for h in highlights]
 
-        # Use the existing function to cut and concatenate the video
+        # Cut and concatenate the video
         cut_video_by_timestamps(
             video_path=str(video_path), timestamps=timestamps, output_path=str(output_path)
         )
@@ -265,26 +284,41 @@ def process_video(job):
         video_path = processor.download_video(video_url)
         
         # Step 2: Transcribe
+        whisper_model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
         transcription = processor.transcribe_video(
             video_path,
-            language=options.get('language', 'auto')
+            language=options.get('language', 'auto'),
+            model_size=whisper_model_size
         )
         
-        # Step 3: Extract highlights (Dummy implementation for now)
-        highlights = processor.extract_highlights(video_path, transcription, options)
-        
-        # Step 4: Create summary (Dummy implementation for now)
-        output_path = Path(tempfile.mktemp(suffix=".mp4"))
+        # Step 3: Get initial summarization and LLM timestamps
+        hook_title, summarized_segments, llm_timestamps = processor.get_summarization_from_video(video_path)
+        if not llm_timestamps:
+            raise RuntimeError("Failed to generate initial timestamps from LLM summarization.")
+
+        # Step 4: Extract highlights based on the selected method
+        method = options.get('method', 'echofusion') # Default to echofusion
+        logger.info(f"Using highlight extraction method: {method}")
+
+        if method == 'llm_only':
+            logger.info("💬 Using timestamps directly from LLM summarization...")
+            # Convert list of [start, end] to list of {"start": start, "end": end}
+            highlights = [{"start": start, "end": end} for start, end in llm_timestamps]
+        else: # Default to 'echofusion' or other future vision-based methods
+            highlights = processor.extract_highlights_echofusion(video_path, llm_timestamps, summarized_segments, options)
+
+        # Step 5: Create summary video
+        output_path = Path(tempfile.mkstemp(suffix=".mp4")[1])
         processor.create_summary_video(video_path, highlights, output_path)
         
-        # Step 5: Upload results
+        # Step 6: Upload results
         result_url = processor.upload_to_supabase(
             output_path,
             bucket="outputs",
             destination=f"{job_id}/summary.mp4"
         )
         
-        # Step 6: Send success webhook
+        # Step 7: Send success webhook
         if webhook_url:
             logger.info(f"Sending webhook to {webhook_url}")
             requests.post(webhook_url, json={

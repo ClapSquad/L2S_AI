@@ -73,6 +73,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY runpod/handler.py handler.py
+COPY src/core/ src/core/
 
 # Environment variables for model caching
 ENV MODEL_CACHE_DIR=/runpod-volume/models \
