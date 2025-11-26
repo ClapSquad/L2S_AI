@@ -1,16 +1,23 @@
 from pathlib import Path
-import uuid
-from core.summarization.video_to_summarization import video_to_summarization
-from core.video_processing.video_processor import cut_video_by_timestamps
-from core.video_processing.video_exporter import export_social_media_vertical_video
-from core.subtitles.subtitles import burn_subtitles, remap_subtitles
-import os, argparse, subprocess, logging, json, sys
+import os
+import sys
 
-# Add the project root to the Python path to allow importing from 'utils'
+# Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-# --- End Path setup ---
+
+import argparse
+import subprocess
+import logging
+import json
+import uuid
+
+from src.core.summarization.video_to_summarization import video_to_summarization
+from src.core.video_processing.video_processor import cut_video_by_timestamps
+from src.core.video_processing.video_exporter import export_social_media_vertical_video
+from src.core.subtitles.subtitles import burn_subtitles, remap_subtitles
+
 
 from utils.logging_initialization import initialize_logging
 
@@ -45,7 +52,7 @@ def main():
 
     video_path = args.file
     base_filename = os.path.splitext(os.path.basename(video_path))[0]
-    output_dir = os.path.join("./assets", f"{base_filename}_{uuid.uuid4().hex[:6]}")
+    output_dir = os.path.join("../assets", f"{base_filename}_{uuid.uuid4().hex[:6]}")
     os.makedirs(output_dir, exist_ok=True)
 
     # --- Summarization / Highlight detection ---
