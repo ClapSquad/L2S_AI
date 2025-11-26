@@ -2,35 +2,41 @@ import subprocess
 import os
 
 
-def export_social_media_vertical_video(input_path, output_path, resolution="1080x1920", bitrate="15M"):
+def export_social_media_vertical_video(input_path, output_path, resolution="1080x1920", bitrate="15M", crop_method="center"):
     """
-    주어진 입력 비디오를 9:16 수직형 MP4로 내보냅니다.
-    - 남는 공간은 원본 영상의 블러 처리된 복사본으로 채웁니다.
-    - 해상도 매개변수를 동적으로 사용하여 FFmpeg 필터 그래프를 구성합니다.
+    Exports a given input video to a 9:16 vertical MP4.
+    - crop_method='center': Crops the central 9:16 area.
+    - crop_method='blur': Fills the remaining space with a blurred copy of the original video.
     """
-
-    # 피드백 1 반영: 해상도 문자열 파싱 및 유효성 검사
+    # Parse and validate the resolution string
     try:
         width, height = map(int, resolution.split('x'))
     except ValueError:
         raise ValueError(f"Invalid resolution format: {resolution}. Expected 'widthxheight'.")
 
-    # 1. FFmpeg 필터 그래프 구축 (동적 변수 사용)
-    filter_complex = (
-        # 1. 원본 스트림 분할
-        f"[0:v]split=2[main][bg];"
+    if crop_method == "blur":
+        # 1. Build FFmpeg filter graph (blur background)
+        filter_complex = (
+            # 1. Split the original stream
+            f"[0:v]split=2[main][bg];"
+            # 2. Create the blurred background stream
+            f"[bg]scale=w={width}:h={height}:force_original_aspect_ratio=increase,boxblur=20:10,crop={width}:{height}[blurry_bg];"
+            # 3. Create the main video stream
+            f"[main]scale=w={width}:h={height}:force_original_aspect_ratio=decrease[main_scaled];"
+            # 4. Final overlay
+            f"[blurry_bg][main_scaled]overlay=(W-w)/2:(H-h)/2[v]"
+        )
+    elif crop_method == "center":
+        # 1. Build FFmpeg filter graph (center crop)
+        target_aspect_ratio = width / height
+        filter_complex = (
+            f"[0:v]crop=ih*{target_aspect_ratio}:ih,scale={width}:{height}[v]"
+        )
+    else:
+        raise ValueError(f"Invalid crop_method: '{crop_method}'. Choose 'center' or 'blur'.")
 
-        # 2. 블러 배경 스트림 생성 [blurry_bg] (동적 {width}, {height} 사용)
-        f"[bg]scale=w={width}:h={height}:force_original_aspect_ratio=increase,boxblur=20:10,crop={width}:{height}[blurry_bg];"
 
-        # 3. 메인 영상 스트림 생성 [main_scaled] (동적 {width}, {height} 사용)
-        f"[main]scale=w={width}:h={height}:force_original_aspect_ratio=decrease[main_scaled];"
-
-        # 4. 최종 오버레이 [v]
-        f"[blurry_bg][main_scaled]overlay=(W-w)/2:(H-h)/2[v]"
-    )
-
-    # 2. FFmpeg 명령어 구성
+    # 2. Configure FFmpeg command
     command = [
         "ffmpeg",
         "-i", input_path,
@@ -38,28 +44,28 @@ def export_social_media_vertical_video(input_path, output_path, resolution="1080
         "-map", "[v]",
         "-map", "0:a",
 
-        # 인코딩 설정
+        # Encoding settings
         "-c:v", "libx264",
         "-b:v", bitrate,
         "-pix_fmt", "yuv420p",
-        "-s", resolution,  # 최종 해상도 설정
+        "-s", resolution,  # Set final resolution
         "-c:a", "aac",
         "-b:a", "192k",
         "-y",
         output_path
     ]
 
-    # 3. FFmpeg 실행
+    # 3. Run FFmpeg
     print(f"\n--- Starting Vertical Export for {os.path.basename(input_path)} ---")
     try:
-        # stdout과 stderr를 캡처
+        # Capture stdout and stderr
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         print(f"✅ Export Successful: {output_path}")
 
-    # 피드백 3 반영: CalledProcessError 발생 시 STDOUT과 STDERR 모두 출력
+    # On CalledProcessError, print both STDOUT and STDERR
     except subprocess.CalledProcessError as e:
         print(f"❌ FFmpeg Error: Export failed for {input_path}")
-        print(f"  STDOUT: {e.stdout.strip()}")  # STDOUT 추가 출력
+        print(f"  STDOUT: {e.stdout.strip()}")  # Print STDOUT
         print(f"  STDERR: {e.stderr.strip()}")
         raise
     except FileNotFoundError:
