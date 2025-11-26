@@ -11,9 +11,9 @@ hd_branch:
     - "the main takeaway"
   weights:
     motion: 0.30
-    clip: 0.30
+    clip: 0.50
     loud: 0.20
-    speech: 0.20
+    speech: 0.00
 
 txt_branch:
   budget_seconds: 90.0
@@ -23,8 +23,8 @@ txt_branch:
 
 fusion:
   w_hd: 0.55
-  w_txt: 0.45
-  w_aud: 0.00
+  w_txt: 0.40
+  w_aud: 0.05
   keep_seconds: 60.0
   min_len: 2.0
   max_len: 60.0

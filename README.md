@@ -4,24 +4,62 @@ This repo contains a modular pipeline designed to automatically analyze video co
 
 ## Table of Contents
 
-- [Core Concepts](#core-concepts)
-- [LLM vs EchoFusion](#llm-vs-echofusion)
-  - [LLM Method](#llm-method)
-    - [Pipeline Flow](#pipeline-flow)
-    - [Detailed Steps](#detailed-steps)
-    - [Key Features](#key-features)
-    - [Potential Use Cases](#potential-use-cases)
-  - [EchoFusion Method](#echofusion-method)
-    - [Pipeline Flow](#pipeline-flow-1)
-    - [Detailed Steps](#detailed-steps-1)
-    - [Configurable Parameters](#configurable-parameters)
-    - [Key Features](#key-features-1)
-    - [Potential Use Cases](#potential-use-cases-1)
-- [Method Comparison](#method-comparison)
-- [Usage Examples](#usage-examples)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
+- [L2S: Long2Short Video Sumammarization](#l2s-long2short-video-sumammarization)
+  - [Table of Contents](#table-of-contents)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+  - [Core Concepts](#core-concepts)
+    - [LLM vs EchoFusion](#llm-vs-echofusion)
+      - [LLM Method](#llm-method)
+        - [Pipeline Flow](#pipeline-flow)
+        - [Detailed Steps](#detailed-steps)
+        - [Key Features](#key-features)
+        - [Potential Use Cases](#potential-use-cases)
+      - [EchoFusion Method](#echofusion-method)
+        - [Pipeline Flow](#pipeline-flow-1)
+        - [Detailed Steps](#detailed-steps-1)
+        - [Configurable Parameters](#configurable-parameters)
+        - [Key Features](#key-features-1)
+        - [Potential Use Cases](#potential-use-cases-1)
+    - [Method Comparison](#method-comparison)
+    - [Usage Examples](#usage-examples)
+  - [Log Warning Meanings](#log-warning-meanings)
+
+
+
+## Getting Started
+
+Follow these steps to set up and run the project locally.
+
+### Prerequisites
+
+1. Docker is recommmended. Otherwise, you can use Anaconda or Python environments.
+
+### Installation
+
+1.  Clone the repository:
+2. Create an `.env` file (see `.env.example`)
+3. If using Docker, build the image and run it like this:
+
+To build the container:
+
+```bash
+docker build -t l2s-ai . # build the container
+```
+
+To run the container:
+- If you don't have an NVIDIA GPU, run: 
+
+```bash
+docker run --rm -it -p 8080:8080 --env-file .env -v .:/app l2s-ai # run the container
+```
+
+- If you have NVIDIA GPU, run
+
+```bash
+docker run --gpus all -it --rm -v .:/app -p 8080:8080 --env-file .env l2s-ai # run the container
+```
 
 
 ## Core Concepts
@@ -232,21 +270,22 @@ python src/main.py -f input.mp4 --method llm --vertical_export
 python src/main.py -f input.mp4 --method echofusion --title "Video Title" --w_hd 0.6 --w_txt 0.4 --keep_seconds 90
 ```
 
-## Getting Started
+## Log Warning Meanings
 
-Follow these steps to set up and run the project locally.
+You may get the following messages in the logs:
 
-### Prerequisites
-
-1. Docker is recommmended. Otherwise, you can use Anaconda or Python environments.
-
-### Installation
-
-1.  Clone the repository:
-2. Create an `.env` file (see `.env.example`)
-3. If using Docker, build the image and run it like this:
-
-```bash
-docker build -t l2s-ai -f Dockerfile . # build the container
-docker run -it --rm -v .:/app -p 8080:8080 l2s-ai # run the container
 ```
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+```
+
+As it suggests, it indicates that any log message that is written before the `InitializeLog` will be output in the console instead of the log file.
+
+```
+E0000 00:00:1763535189.463905   31781 alts_credentials.cc:93] ALTS creds ignored. Not running on GCP and untrusted ALTS is not enabled.
+```
+
+This one is harmless. It appears when we are using Google Cloud services (like their AI models) from our local computer instead of from inside Google's cloud servers. It basically means:
+- `ALTS ignored`: ALTS means "Application Layer Transport Security". It's a special security system that Google uses inside their data centers.
+- `Not running on GCP`: GCP is Google Cloud Platform. Our code is running on our local computer and not on Google's servers.
+
+So it basically says that we are not on Google servers, so it skips the security layer and uses regular internet security instead.

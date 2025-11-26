@@ -1,5 +1,5 @@
-from core.video_processing.video_to_audio import convert_video_to_audio
-from core.audio_processing.audio_to_text import transcribe_audio
+from src.core.video_processing.video_to_audio import convert_video_to_audio
+from src.core.audio_processing.audio_to_text import transcribe_audio
 from .llm_client import call_gemini
 import logging, shutil, os, json
 from typing import List, Tuple
