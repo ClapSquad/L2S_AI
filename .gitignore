@@ -15,9 +15,6 @@ __pycache__/
 *.log
 .env
 
-# Datasets
-heatmap_dataset.jsonl
-
 *.mp4
 *.webm
 *jpg
