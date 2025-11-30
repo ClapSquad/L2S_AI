@@ -120,6 +120,11 @@ class VideoProcessor:
     
     def upload_to_supabase(self, file_path: Path, bucket: str, destination: str) -> str:
         """Upload file to Supabase Storage"""
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if mime_type is None:
+            mime_type = "application/octet-stream"
+
         from supabase import create_client
         
         supabase_url = os.getenv("SUPABASE_URL")
@@ -133,12 +138,12 @@ class VideoProcessor:
         logger.info(f"⬆️  Uploading to Supabase: {bucket}/{destination}")
         
         supabase = create_client(supabase_url, supabase_key)
-        
+
         with open(file_path, 'rb') as f:
             response = supabase.storage.from_(bucket).upload(
                 destination,
                 f,
-                file_options={"content-type": "video/mp4"}
+                file_options={"content-type": mime_type}
             )
         
         # Get public URL
@@ -247,6 +252,58 @@ class VideoProcessor:
 
         logger.info(f"✅ Summary created: {output_path}")
         return output_path
+
+    def generate_thumbnail(
+            self,
+            video_path: str,
+            output_path: str,
+            timestamp: str = "00:00:01",
+            width: int = 640,
+            height: int = -1,
+            quality: int = 2
+    ) -> bool:
+        if not os.path.exists(video_path):
+            print(f"Error: Video file not found: {video_path}")
+            return False
+
+        try:
+            import subprocess
+            # FFmpeg command to extract thumbnail
+            command = [
+                "ffmpeg",
+                "-ss", timestamp,  # Seek to timestamp
+                "-an",
+                "-dn",
+                "-sn",
+                "-i", video_path,  # Input file
+                "-vframes", "1",  # Extract 1 frame
+                "-vf", f"scale={width}:{height}",  # Resize
+                "-q:v", str(quality),  # Quality
+                "-y",  # Overwrite output file
+                output_path
+            ]
+
+            # Run FFmpeg
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+
+            # Check if thumbnail was created
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                return True
+            else:
+                print("Error: Thumbnail file was not created")
+                return False
+
+        except subprocess.CalledProcessError as e:
+            print(f"FFmpeg error: {e.stderr.decode()}")
+            return False
+        except Exception as e:
+            print(f"Error generating thumbnail: {str(e)}")
+            return False
 
 
 # Global processor instance (reused across warm starts)
@@ -362,6 +419,101 @@ def process_video(job):
             "error": str(e)
         }
 
+def process_thumbnail(job):
+    job_input = job.get("input", {})
+    webhook_url = None
+    job_id = None
+
+    try:
+        # 2. Safely extract job_id and webhook_url first
+        job_id = job_input.get('job_id', job.get('id'))  # Fallback to RunPod ID if not in input
+        webhook_url = job_input.get('webhook_url')
+
+        logger.info("=" * 50)
+        logger.info(f"Starting video processing for Job ID: {job_id}")
+
+        # 3. Check for required video_url AFTER extracting the basics
+        video_url = job_input.get('video_url')
+        if not video_url:
+            raise ValueError("Missing 'video_url' in input payload")
+
+        # Step 1: Download
+        video_path = processor.download_video(video_url)
+
+        # Step 5: Create thumbnail
+        output_path = Path(tempfile.mkstemp(suffix=".jpg")[1])
+        processor.generate_thumbnail(str(video_path), str(output_path))
+
+        # Step 6: Upload results
+        result_url = processor.upload_to_supabase(
+            output_path,
+            bucket="thumbnails",
+            destination=f"{job_id}.jpg"
+        )
+
+        # Step 7: Send success webhook
+        if webhook_url:
+            logger.info(f"Sending webhook to {webhook_url}")
+            requests.post(webhook_url, json={
+                "job_id": job_id,
+                "status": "completed",
+                "result_url": result_url
+            })
+
+        # Cleanup
+        if video_path.exists(): video_path.unlink()
+        if output_path.exists(): output_path.unlink()
+
+        logger.info("✅ Processing complete!")
+        return {
+            "status": "success",
+            "job_id": job_id,
+            "result_url": result_url,
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error processing job {job_id}: {e}", exc_info=True)
+
+        # Send error webhook (Only if we successfully parsed the URL)
+        if webhook_url:
+            try:
+                requests.post(webhook_url, json={
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error": str(e)
+                })
+            except Exception as webhook_err:
+                logger.error(f"Failed to send error webhook: {webhook_err}")
+
+        # Return error to RunPod
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+def task_router(job):
+    try:
+        job_input = job.get("input", {})
+        job_id = job.get("id")
+        task = job_input.get("task")
+
+        if task == "process_video":
+            return process_video(job)
+        elif task =="generate_thumbnail":
+            return process_thumbnail(job)
+        else:
+            raise Exception(f"{task} is not a valid task, task must be either 'process_video' or 'generate_thumbnail")
+
+
+    except Exception as e:
+        logger.error(f"❌ Error processing job {job_id}: {e}", exc_info=True)
+
+        # Return error to RunPod
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
 
 # RunPod serverless entry point
 if __name__ == "__main__":
@@ -370,6 +522,6 @@ if __name__ == "__main__":
     
     # Start the serverless handler
     runpod.serverless.start({
-        "handler": process_video,
+        "handler": task_router,
         "return_aggregate_stream": True
     })
