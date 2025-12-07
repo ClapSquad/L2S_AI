@@ -116,8 +116,8 @@ STYLE_CONFIGS: Dict[SubtitleStyleType, SubtitleStyleConfig] = {
     ),
     
     SubtitleStyleType.CASUAL: SubtitleStyleConfig(
-        font_name="Jua",                     # Korean-friendly font
-        font_size=54,
+        font_name="Noto Sans CJK KR",                     
+        font_size=85,
         bold=True,
         primary_color="&H00FFFFFF&",        # White
         outline_color="&H00000000&",        # Black outline
@@ -131,7 +131,7 @@ STYLE_CONFIGS: Dict[SubtitleStyleType, SubtitleStyleConfig] = {
     
     SubtitleStyleType.DYNAMIC: SubtitleStyleConfig(
         font_name="Noto Sans CJK KR",                  # Bold, impactful font
-        font_size=56,
+        font_size=85,
         bold=True,
         primary_color="&H00FFFFFF&",        # White
         outline_color="&H00000000&",        # Black outline
