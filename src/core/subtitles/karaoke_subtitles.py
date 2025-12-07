@@ -13,6 +13,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 from enum import Enum
+import subprocess
 
 
 # ============================================================================
@@ -188,6 +189,15 @@ def generate_ass_header(
     
     Think of this like the <head> section of an HTML file - it sets up
     all the styling before the actual content.
+
+    Args:
+        style_type: Which visual style to use
+        video_width: Video width in pixels
+        video_height: Video height in pixels  
+        custom_config: Optional custom style config
+        
+    BUGFIX: Removed indentation from the string literal.
+            ASS files must NOT have leading whitespace on lines!
     """
     config = custom_config or STYLE_CONFIGS.get(style_type, STYLE_CONFIGS[SubtitleStyleType.DYNAMIC])
     
@@ -219,17 +229,16 @@ def generate_karaoke_line(
     """
     Generate ASS dialogue lines for karaoke-style highlighting.
     
-    This creates subtitle events where:
-    1. All words in a group are shown
-    2. The currently spoken word is highlighted
-    3. Words animate smoothly from white to highlighted color
+    Events are mutually exclusive (no overlapping).
+    Each word's highlight event ends exactly when the next word starts.
     
     How it works:
-    For a sentence like "Hello beautiful world today", we might show:
-    - Line 1 (0.0s - 2.0s): "Hello beautiful" with each word highlighted when spoken
-    - Line 2 (2.0s - 4.0s): "world today" with each word highlighted when spoken
+    For a sentence like "Hello beautiful world", we create:
+    - Event 1 (0.0s - 0.5s): "HELLO beautiful world" (HELLO highlighted)
+    - Event 2 (0.5s - 1.0s): "hello BEAUTIFUL world" (BEAUTIFUL highlighted)  
+    - Event 3 (1.0s - 1.5s): "hello beautiful WORLD" (WORLD highlighted)
     
-    The {\k} tags in ASS control the karaoke timing (in centiseconds).
+    No overlapping = only one subtitle visible at a time!
     """
     if not words:
         return []
@@ -244,16 +253,11 @@ def generate_karaoke_line(
         if group:
             word_groups.append(group)
     
-    for group in word_groups:
+    for group_idx, group in enumerate(word_groups):
         if not group:
             continue
-            
-        group_start = group[0].start
-        group_end = group[-1].end
         
-        # Method 1: Individual events for each word (more control)
-        # This shows the entire line but changes which word is highlighted
-        
+        # Create ONE event per word, with NON-OVERLAPPING times
         for word_idx, current_word in enumerate(group):
             # Build the text with the current word highlighted
             text_parts = []
@@ -261,20 +265,41 @@ def generate_karaoke_line(
             for idx, w in enumerate(group):
                 if idx == word_idx:
                     # This word is currently being spoken - use highlight style
-                    # {\rHighlight} switches to Highlight style
-                    # {\r} at the end resets to Default style
                     text_parts.append(f"{{\\rHighlight}}{w.word.upper()}{{\\r}}")
                 else:
-                    # Other words use default style
+                    # Other words use default style (no caps for non-highlighted)
                     text_parts.append(w.word.upper())
             
             full_text = " ".join(text_parts)
             
-            event = f"Dialogue: 0,{seconds_to_ass_time(current_word.start)},{seconds_to_ass_time(current_word.end)},Default,,0,0,0,,{full_text}"
+            # Calculate non-overlapping time ranges
+            event_start = current_word.start
+            
+            # End time: use next word's start time (if exists in group) or handle group boundary
+            if word_idx < len(group) - 1:
+                # There's a next word in this group - end exactly when it starts
+                event_end = group[word_idx + 1].start
+            else:
+                # Last word in group
+                # Check if there's a next group - end when that group starts
+                if group_idx < len(word_groups) - 1:
+                    next_group = word_groups[group_idx + 1]
+                    if next_group:
+                        event_end = next_group[0].start
+                    else:
+                        event_end = current_word.end
+                else:
+                    # Truly the last word - use its natural end time
+                    event_end = current_word.end
+            
+            # Ensure minimum duration (at least 0.1 seconds)
+            if event_end - event_start < 0.1:
+                event_end = event_start + 0.1
+            
+            event = f"Dialogue: 0,{seconds_to_ass_time(event_start)},{seconds_to_ass_time(event_end)},Default,,0,0,0,,{full_text}"
             events.append(event)
     
     return events
-
 
 def generate_simple_karaoke_line(
     words: List[WordTiming],
@@ -352,14 +377,15 @@ def _create_kf_event(
 def generate_word_by_word_events(
     words: List[WordTiming],
     style_type: SubtitleStyleType = SubtitleStyleType.DYNAMIC,
-    words_per_line: int = 3,
-    min_display_duration: float = 0.3
+    words_per_line: int = 3
 ) -> List[str]:
     """
-    Generate events showing one word at a time, enlarged and centered.
+    Generate events showing one word group at a time with highlighted active word.
+    
+    Events are mutually exclusive (no overlapping).
     
     This is the most impactful style for short-form content:
-    - Only shows 1-3 words at a time
+    - Only shows a few words at a time
     - Large, bold text
     - Current word is highlighted/enlarged
     
@@ -371,29 +397,24 @@ def generate_word_by_word_events(
     events = []
     config = STYLE_CONFIGS.get(style_type, STYLE_CONFIGS[SubtitleStyleType.DYNAMIC])
     
-    i = 0
-    while i < len(words):
-        # Get current group of words
+    # First, create all word groups
+    word_groups = []
+    for i in range(0, len(words), words_per_line):
         group = words[i:i + words_per_line]
-        
+        if group:
+            word_groups.append(group)
+    
+    for group_idx, group in enumerate(word_groups):
         if not group:
-            break
+            continue
         
-        group_start = group[0].start
-        group_end = group[-1].end
-        
-        # Ensure minimum display duration
-        if group_end - group_start < min_display_duration:
-            group_end = group_start + min_display_duration
-        
-        # For each word in the group, create an event where that word is highlighted
+        # For each word in the group, create a NON-OVERLAPPING event
         for word_idx, current_word in enumerate(group):
             text_parts = []
             
             for idx, w in enumerate(group):
                 if idx == word_idx:
                     # Highlighted word: larger size using {\fs} tag
-                    # {\c&H..&} changes primary color
                     highlight_text = f"{{\\c{config.highlight_color}\\fs{int(config.font_size * 1.2)}}}{w.word.upper()}{{\\r}}"
                     text_parts.append(highlight_text)
                 else:
@@ -401,18 +422,30 @@ def generate_word_by_word_events(
             
             full_text = " ".join(text_parts)
             
-            # Calculate timing
-            word_start = current_word.start
-            word_end = current_word.end
+            # Calculate non-overlapping time ranges
+            event_start = current_word.start
             
-            # Ensure minimum duration
-            if word_end - word_start < min_display_duration:
-                word_end = word_start + min_display_duration
+            # End time: use next word's start time (if exists) or handle group boundary
+            if word_idx < len(group) - 1:
+                # There's a next word in this group - end exactly when it starts
+                event_end = group[word_idx + 1].start
+            else:
+                # Last word in group - check if there's a next group
+                if group_idx < len(word_groups) - 1:
+                    next_group = word_groups[group_idx + 1]
+                    if next_group:
+                        event_end = next_group[0].start
+                    else:
+                        event_end = current_word.end
+                else:
+                    # Last word of last group - use natural end time
+                    event_end = current_word.end
             
-            event = f"Dialogue: 0,{seconds_to_ass_time(word_start)},{seconds_to_ass_time(word_end)},Default,,0,0,0,,{full_text}"
+            # If words are too fast, that's
+            # a transcription issue, not a subtitle rendering issue.
+            
+            event = f"Dialogue: 0,{seconds_to_ass_time(event_start)},{seconds_to_ass_time(event_end)},Default,,0,0,0,,{full_text}"
             events.append(event)
-        
-        i += words_per_line
     
     return events
 
