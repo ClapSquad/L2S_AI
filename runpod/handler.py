@@ -1,13 +1,17 @@
 """
-RunPod Handler for Video Processing
-===================================
+RunPod Serverless Handler for L2S AI Video Processing
+======================================================
 This handler orchestrates the complete video processing pipeline including:
 - Video download and transcription
 - Highlight extraction (LLM or EchoFusion method)
 - Summary video creation
-- Subtitles (optional) - Burns captions into the video
+- Karaoke-style subtitles (optional) - Burns animated captions into the video
 - Vertical cropping (optional) - Converts to 9:16 format for Shorts/Reels
 - Upload to Supabase storage
+
+Supported Tasks:
+- "process_video": Full video processing pipeline
+- "generate_thumbnail": Generate thumbnail from video
 """
 
 import os
@@ -18,9 +22,22 @@ import requests
 import yaml
 from pathlib import Path
 
+# Add the project root to the Python path
+project_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root))
+
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format='%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+)
 logger = logging.getLogger(__name__)
+
+# Silence overly verbose loggers from libraries
+logging.getLogger("open_clip").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
 
 # Try to import RunPod (may not be available in local testing)
 try:
@@ -29,50 +46,96 @@ except ImportError:
     logger.warning("RunPod not installed. Running in local mode.")
     runpod = None
 
+# Model cache directory (RunPod Network Volume)
+MODEL_DIR = Path(os.getenv("MODEL_CACHE_DIR", "/runpod-volume/models"))
+MODEL_DIR.mkdir(exist_ok=True, parents=True)
+
+logger.info(f"Model directory: {MODEL_DIR}")
+logger.info(f"Starting RunPod Serverless Handler...")
+
 
 class VideoProcessor:
     """
     Main video processing class that handles all operations.
+    
+    This class is instantiated once when the server starts ("warm start")
+    and reused for all subsequent requests for better performance.
     """
     
     def __init__(self):
-        """
-        Initialize the processor.
-        This runs once when the server starts (called "warm start").
-        """
+        """Initialize the processor and load configuration."""
+        self.whisper_model = None
         self.clip_model = None
         self.clip_preprocess = None
+        self.device = "cuda" if os.getenv("USE_GPU", "1") == "1" else "cpu"
         self.config = {}
         self._load_config()
-    
+        logger.info(f"Initializing VideoProcessor on device: {self.device}")
+
+    def _load_config(self):
+        """Load configuration from YAML file"""
+        # Try multiple possible config locations
+        config_paths = [
+            Path(__file__).parent / "config" / "config.yaml",
+            Path("src/core/highlight_detection/config.yaml"),
+        ]
+        
+        for config_path in config_paths:
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    self.config = yaml.safe_load(f)
+                logger.info(f"Configuration loaded from {config_path}")
+                return
+        
+        logger.warning("No config file found. Using defaults.")
+        self.config = {}
+
     def _load_clip(self):
         """Lazy-load CLIP model (only when needed for EchoFusion)"""
         if self.clip_model is None:
-            import clip
+            import open_clip
             import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device=device)
-            logger.info(f"CLIP model loaded on {device}")
+            
+            cache_dir = MODEL_DIR / "clip"
+            cache_dir.mkdir(exist_ok=True)
+            
+            self.clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms(
+                "ViT-B-32",
+                pretrained="openai",
+                cache_dir=str(cache_dir)
+            )
+            
+            if torch.cuda.is_available():
+                self.clip_model = self.clip_model.cuda()
+            
+            logger.info(f"CLIP model loaded on {self.device}")
         return self.clip_model, self.clip_preprocess
 
-    def _load_config(self):
-        """Load the main config.yaml file"""
-        config_path = "src/core/highlight_detection/config.yaml"
-        logger.info(f"Loading configuration from {config_path}")
-        try:
-            with open(config_path, 'r') as f:
-                self.config = yaml.safe_load(f)
-            logger.info("Configuration loaded.")
-        except FileNotFoundError:
-            logger.warning(f"Config file not found at {config_path}. Using defaults.")
-            self.config = {}
-    
+    def load_whisper(self, model_size="medium"):
+        """Load Whisper model (cached in network volume)"""
+        if self.whisper_model is not None:
+            return self.whisper_model
+            
+        logger.info(f"Loading Whisper {model_size}...")
+        from faster_whisper import WhisperModel
+        
+        compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "float16")
+        self.whisper_model = WhisperModel(
+            model_size,
+            device=self.device,
+            compute_type=compute_type,
+            download_root=str(MODEL_DIR)
+        )
+        
+        logger.info("Whisper loaded!")
+        return self.whisper_model
+
     # =========================================================================
     # STEP 1: Download Video
     # =========================================================================
     def download_video(self, url: str) -> Path:
         """
-        Download video from a URL
+        Download video from a URL (typically Supabase storage).
         
         Args:
             url: The public URL of the video to download
@@ -82,16 +145,13 @@ class VideoProcessor:
             
         Example:
             video_path = processor.download_video("https://supabase.../video.mp4")
-            # video_path = Path("/tmp/abc123.mp4")
         """
-        logger.info(f"⬇️  Downloading video from {url}")
+        logger.info(f"⬇️  Downloading video from {url[:50]}...")
         
-        # Create a temporary file to store the video
         temp_file = Path(tempfile.mktemp(suffix=".mp4"))
         
-        # Download the video in chunks (better for large files)
         response = requests.get(url, stream=True)
-        response.raise_for_status()  # Raise error if download fails
+        response.raise_for_status()
         
         with open(temp_file, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
@@ -99,7 +159,7 @@ class VideoProcessor:
         
         logger.info(f"✅ Downloaded to {temp_file}")
         return temp_file
-    
+
     # =========================================================================
     # STEP 2: Transcribe Video
     # =========================================================================
@@ -107,39 +167,39 @@ class VideoProcessor:
         """
         Convert video audio to text using Whisper AI.
         
+        This produces segment-level transcription (sentences/phrases with timestamps).
+        
         Args:
             video_path: Path to the video file
             language: Language code ('ko', 'en', 'auto' for automatic detection)
             model_size: Whisper model size ('tiny', 'base', 'small', 'medium', 'large')
             
         Returns:
-            list: List of transcription segments
-                  [{"start": 0.0, "end": 2.5, "text": "Hello world"}, ...]
+            list: [{"start": 0.0, "end": 2.5, "text": "Hello world"}, ...]
         """
         logger.info(f"🎤 Transcribing {video_path} using '{model_size}' model...")
         
-        # Import the transcription tools from your project
         from src.core.video_processing.video_to_audio import convert_video_to_audio
         from src.core.audio_processing.audio_to_text import transcribe_audio
         
         temp_dir = Path(tempfile.mkdtemp())
 
         try:
-            # Step 1: Extract audio from video (video → audio.wav)
+            # Step 1: Extract audio from video
             audio_file_name = convert_video_to_audio(str(video_path), str(temp_dir))
             if not audio_file_name:
-                raise RuntimeError("Audio conversion failed, convert_video_to_audio returned None.")
+                raise RuntimeError("Audio conversion failed")
             
             audio_path = temp_dir / audio_file_name
 
-            # Step 2: Transcribe audio to text (audio.wav → text + timestamps)
+            # Step 2: Transcribe audio to text
             transcribed_segments = transcribe_audio(str(audio_path), model_name=model_size)
             if not isinstance(transcribed_segments, list):
                 raise RuntimeError(f"Transcription failed: {transcribed_segments}")
 
-            # Step 3: Format output to match expected structure
-            # Input format: [(text, (start_time, end_time)), ...]
-            # Output format: [{"start": start, "end": end, "text": text}, ...]
+            # Step 3: Format output
+            # Input: [(text, (start_time, end_time)), ...]
+            # Output: [{"start": start, "end": end, "text": text}, ...]
             transcription = [
                 {"start": start, "end": end, "text": text}
                 for text, (start, end) in transcribed_segments
@@ -149,10 +209,53 @@ class VideoProcessor:
             return transcription
             
         finally:
-            # Always clean up temporary files
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)
-            logger.info(f"Cleaned up temporary directory: {temp_dir}")
+
+    def transcribe_for_subtitles(self, video_path: Path, model_size: str = "base") -> list:
+        """
+        Transcribe video with WORD-LEVEL timestamps for karaoke subtitles.
+        
+        This is different from regular transcription - we need individual word timings
+        so each word can be highlighted as it's spoken.
+        
+        Args:
+            video_path: Path to the video file
+            model_size: Whisper model size
+            
+        Returns:
+            list: [{"word": "Hello", "start": 0.0, "end": 0.3}, ...]
+        """
+        logger.info(f"🎤 Transcribing for karaoke subtitles: {video_path}")
+        
+        from src.core.video_processing.video_to_audio import convert_video_to_audio
+        from src.core.audio_processing.audio_to_text_enhanced import transcribe_for_karaoke
+        
+        temp_dir = Path(tempfile.mkdtemp())
+        
+        try:
+            # Convert video to audio
+            audio_file_name = convert_video_to_audio(str(video_path), str(temp_dir))
+            if not audio_file_name:
+                raise RuntimeError("Audio conversion failed")
+            
+            audio_path = temp_dir / audio_file_name
+            
+            # Transcribe with word-level timestamps
+            words = transcribe_for_karaoke(str(audio_path), model_size)
+            
+            if isinstance(words, str):  # Error message returned
+                raise RuntimeError(f"Transcription failed: {words}")
+            
+            if not words:
+                raise RuntimeError("No words detected in audio")
+            
+            logger.info(f"✅ Detected {len(words)} words for subtitles")
+            return words
+            
+        finally:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     # =========================================================================
     # STEP 3: Get Summarization (Title + Summary + Timestamps)
@@ -164,16 +267,10 @@ class VideoProcessor:
         2. A summary of the content
         3. Timestamps of the most important moments
         
-        Args:
-            video_path: Path to the video file
-            
         Returns:
             tuple: (hook_title, summarized_segments, llm_timestamps)
-                - hook_title: "Secrets 99% don't know" (catchy title)
-                - summarized_segments: [(text, (start, end)), ...] (for subtitles)
-                - llm_timestamps: [[start, end], ...] (highlight times)
         """
-        logger.info("🧠 Running LLM summarization to get title, summary, and timestamps...")
+        logger.info("🧠 Running LLM summarization...")
         
         from src.core.summarization.video_to_summarization import video_to_summarization
         
@@ -186,26 +283,16 @@ class VideoProcessor:
             return None, None, []
 
     # =========================================================================
-    # STEP 4: Extract Highlights (EchoFusion Method)
+    # STEP 4: Extract Highlights
     # =========================================================================
     def extract_highlights_echofusion(self, video_path: Path, llm_timestamps: list, 
                                        summarized_segments: str, options: dict) -> list:
         """
-        Use the advanced EchoFusion pipeline to detect highlights.
-        
-        EchoFusion combines multiple signals:
+        Use EchoFusion pipeline to detect highlights by combining:
         - Visual features (motion, scene changes)
-        - Audio features (volume, speech patterns)
+        - Audio features (volume, speech patterns)  
         - Text features (what's being said)
         
-        This is more accurate than LLM-only but takes longer.
-        
-        Args:
-            video_path: Path to the video
-            llm_timestamps: Initial timestamps from LLM
-            summarized_segments: Text summary from LLM
-            options: Processing options from the user
-            
         Returns:
             list: [{"start": 0.0, "end": 10.0, "score": 0.95}, ...]
         """
@@ -213,11 +300,10 @@ class VideoProcessor:
         
         from src.core.highlight_detection.highlight_pipeline import run_echofusion
 
-        # Get fusion weights from options or use defaults from config
         fusion_cfg = self.config.get("fusion", {})
-        w_hd = options.get("w_hd", fusion_cfg.get("w_hd", 0.55))      # Visual weight
-        w_txt = options.get("w_txt", fusion_cfg.get("w_txt", 0.45))   # Text weight
-        w_aud = options.get("w_aud", fusion_cfg.get("w_aud", 0.0))    # Audio weight
+        w_hd = options.get("w_hd", fusion_cfg.get("w_hd", 0.55))
+        w_txt = options.get("w_txt", fusion_cfg.get("w_txt", 0.45))
+        w_aud = options.get("w_aud", fusion_cfg.get("w_aud", 0.0))
         keep_seconds = options.get("keep_seconds", fusion_cfg.get("keep_seconds", 60.0))
 
         predictions = run_echofusion(
@@ -231,9 +317,6 @@ class VideoProcessor:
             keep_seconds=keep_seconds
         )
 
-        # Convert predictions to the format expected by the rest of the pipeline
-        # Input format: [(start, end, score, rank), ...]
-        # Output format: [{"start": start, "end": end, "score": score}, ...]
         highlights = [
             {"start": start, "end": end, "score": score} 
             for start, end, score, rank in predictions
@@ -243,20 +326,13 @@ class VideoProcessor:
         return highlights
 
     # =========================================================================
-    # STEP 5: Create Summary Video (Cut and Concatenate)
+    # STEP 5: Create Summary Video
     # =========================================================================
     def create_summary_video(self, video_path: Path, highlights: list, output_path: Path):
         """
-        Cut the highlight segments from the original video and combine them.
+        Cut highlight segments from the original video and concatenate them.
         
-        Think of it like making a "best moments" compilation:
-        1. Cut out each highlight segment
-        2. Glue them together in order
-        
-        Args:
-            video_path: Original video
-            highlights: List of highlight timestamps [{"start": 0, "end": 10}, ...]
-            output_path: Where to save the summary video
+        Think of it like making a "best moments" compilation.
         """
         logger.info("✂️  Creating summary video...")
 
@@ -266,9 +342,6 @@ class VideoProcessor:
 
         from src.core.video_processing.video_processor import cut_video_by_timestamps
 
-        # Convert highlights to the format expected by cut_video_by_timestamps
-        # Input: [{"start": 0, "end": 10}, ...]
-        # Output: [(0, 10), ...]
         timestamps = [(h["start"], h["end"]) for h in highlights]
 
         cut_video_by_timestamps(
@@ -281,68 +354,60 @@ class VideoProcessor:
         return output_path
 
     # =========================================================================
-    # STEP 6: Add Subtitles
+    # STEP 6: Add Karaoke Subtitles
     # =========================================================================
-    def add_subtitles(self, video_path: Path, summarized_segments: list, output_path: Path) -> Path:
+    def burn_karaoke_subtitles(
+        self,
+        video_path: Path,
+        output_path: Path,
+        words: list,
+        style: str = "dynamic",
+        video_width: int = 1080,
+        video_height: int = 1920,
+        words_per_line: int = 3
+    ) -> Path:
         """
-        Burn subtitles (captions) into the video.
+        Burn karaoke-style subtitles into the video.
         
-        This takes the transcription and "burns" (permanently adds) the text
-        onto the video so viewers can read what's being said.
-        
-        IMPORTANT: The timestamps need to be "remapped" because the summary video
-        is shorter than the original. For example:
-        - Original video: Segment at 30-35 seconds
-        - Summary video: That same segment might now be at 0-5 seconds
+        Creates TikTok/Reels style captions where each word is highlighted
+        as it's spoken.
         
         Args:
-            video_path: Path to the summary video (already cut)
-            summarized_segments: Original transcription [(text, (start, end)), ...]
+            video_path: Input video
             output_path: Where to save the subtitled video
+            words: Word timing data [{"word": "Hello", "start": 0.0, "end": 0.4}, ...]
+            style: 
+                - "dynamic": Neon green highlight, centered on screen (TikTok style)
+                - "casual": Yellow highlight, bottom of screen with shadow
+            video_width: Video width in pixels
+            video_height: Video height in pixels
+            words_per_line: How many words to show at once (3-4 recommended)
             
         Returns:
-            Path: Path to the subtitled video
+            Path: Path to the output video with burned subtitles
         """
-        logger.info("💬 Adding subtitles to video...")
+        logger.info(f"🔥 Burning {style} karaoke subtitles...")
         
-        from src.core.subtitles.subtitles import burn_subtitles, remap_subtitles
+        from src.core.subtitles.subtitle_burner import burn_karaoke_subtitles
         
-        # Create a temporary directory for subtitle processing
-        temp_dir = Path(tempfile.mkdtemp())
+        # Validate style - only allow "dynamic" or "casual"
+        if style not in ["dynamic", "casual"]:
+            logger.warning(f"Unknown style '{style}', defaulting to 'dynamic'")
+            style = "dynamic"
         
-        try:
-            # Step 1: Remap the subtitle timestamps to match the new (shorter) video
-            # Original: [(text, (30.0, 35.0)), ...] 
-            # Remapped: [(text, (0.0, 5.0)), ...]  
-            remapped_segments = remap_subtitles(summarized_segments)
-            logger.info(f"Remapped {len(remapped_segments)} subtitle segments")
-            
-            # Step 2: Copy the input video to temp directory
-            # (burn_subtitles expects the video in a specific location)
-            import shutil
-            temp_video_name = "input_video.mp4"
-            temp_video_path = temp_dir / temp_video_name
-            shutil.copy(str(video_path), str(temp_video_path))
-            
-            # Step 3: Burn the subtitles into the video
-            subtitled_video = burn_subtitles(
-                file_name=temp_video_name,
-                summarized_segments=remapped_segments,
-                video_path=str(temp_dir),
-                output_path=str(temp_dir),
-                burn_in=True  # Permanently burn subtitles (not as separate track)
-            )
-            
-            # Step 4: Copy the result to the final output path
-            shutil.copy(subtitled_video, str(output_path))
-            
-            logger.info(f"✅ Subtitles added: {output_path}")
-            return output_path
-            
-        finally:
-            # Clean up temp directory
-            import shutil
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        result = burn_karaoke_subtitles(
+            video_path=str(video_path),
+            words=words,
+            output_path=str(output_path),
+            style=style,
+            video_width=video_width,
+            video_height=video_height,
+            words_per_line=words_per_line,
+            karaoke_mode="word_by_word"  # Best for short-form content
+        )
+        
+        logger.info(f"✅ Subtitles burned: {result}")
+        return Path(result)
 
     # =========================================================================
     # STEP 7: Convert to Vertical Format
@@ -352,27 +417,25 @@ class VideoProcessor:
         """
         Convert a horizontal (16:9) video to vertical (9:16) for Shorts/Reels/TikTok.
         
-        Two crop methods are available:
-        - "center": Crops the center portion (loses sides of the video)
-        - "blur": Keeps full video in center with blurred background filling the sides
-        
         Args:
             video_path: Input video (usually 16:9 horizontal)
             output_path: Where to save the vertical video
-            crop_method: "center" or "blur"
+            crop_method: 
+                - "center": Crops the center portion (loses sides)
+                - "blur": Keeps full video in center with blurred background
             
         Returns:
             Path: Path to the vertical video
         """
-        logger.info(f"📱 Converting to vertical (9:16) format using '{crop_method}' method...")
+        logger.info(f"📱 Converting to vertical (9:16) using '{crop_method}' method...")
         
         from src.core.video_processing.video_exporter import export_social_media_vertical_video
         
         export_social_media_vertical_video(
             input_path=str(video_path),
             output_path=str(output_path),
-            resolution="1080x1920",  # Standard vertical resolution
-            bitrate="15M",           # High quality bitrate
+            resolution="1080x1920",
+            bitrate="15M",
             crop_method=crop_method
         )
         
@@ -388,7 +451,7 @@ class VideoProcessor:
         
         Args:
             file_path: Local file to upload
-            bucket: Supabase storage bucket name ("outputs", "videos", etc.)
+            bucket: Supabase storage bucket name ("outputs", "thumbnails", etc.)
             destination: Path within the bucket ("job123/summary.mp4")
             
         Returns:
@@ -397,21 +460,18 @@ class VideoProcessor:
         import mimetypes
         from supabase import create_client
         
-        # Determine the file's MIME type (video/mp4, image/jpeg, etc.)
         mime_type, _ = mimetypes.guess_type(str(file_path))
         if mime_type is None:
             mime_type = "application/octet-stream"
 
-        # Get Supabase credentials from environment variables
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         
         if not supabase_url or not supabase_key:
-            raise ValueError("Supabase credentials not configured. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
+            raise ValueError("Supabase credentials not configured")
         
         logger.info(f"⬆️  Uploading to Supabase: {bucket}/{destination}")
         
-        # Create Supabase client and upload
         supabase = create_client(supabase_url, supabase_key)
 
         with open(file_path, 'rb') as f:
@@ -421,7 +481,6 @@ class VideoProcessor:
                 file_options={"content-type": mime_type}
             )
         
-        # Get the public URL for the uploaded file
         public_url = supabase.storage.from_(bucket).get_public_url(destination)
         
         logger.info(f"✅ Uploaded: {public_url}")
@@ -446,13 +505,13 @@ class VideoProcessor:
         Returns:
             bool: True if successful
         """
+        import subprocess
+        
         if not os.path.exists(video_path):
             logger.error(f"Video file not found: {video_path}")
             return False
 
         try:
-            import subprocess
-            
             command = [
                 "ffmpeg",
                 "-ss", timestamp,
@@ -487,45 +546,49 @@ class VideoProcessor:
 
 
 # =============================================================================
-# GLOBAL PROCESSOR INSTANCE
+# GLOBAL PROCESSOR INSTANCE (reused across warm starts)
 # =============================================================================
-# This is created once when the server starts and reused for all requests
-# (this is called "warm start" - makes subsequent requests faster)
 processor = VideoProcessor()
 
 
 # =============================================================================
-# MAIN PROCESSING FUNCTION
+# MAIN VIDEO PROCESSING FUNCTION
 # =============================================================================
 def process_video(job):
     """
     Main video processing function called by RunPod.
     
-    This is the "orchestrator" that calls all the other functions in order.
-    
-    The job input should look like this:
+    Expected input payload:
     {
         "input": {
             "job_id": "abc123",
             "video_url": "https://supabase.../video.mp4",
             "webhook_url": "https://your-backend.com/webhook",
             "options": {
-                "method": "echofusion",  // or "llm_only"
-                "language": "auto",
-                "subtitle": true,         
-                "vertical": true,         
-                "crop_method": "center"   
+                "method": "echofusion" | "llm_only",
+                "language": "auto" | "ko" | "en",
+                
+                // Subtitle options
+                "subtitles": true | false,
+                "subtitle_style": "dynamic" | "casual",
+                
+                // Vertical conversion options  
+                "vertical": true | false,
+                "crop_method": "center" | "blur",
+                
+                // EchoFusion options
+                "title": "Video title",
+                "w_hd": 0.55,
+                "w_txt": 0.45,
+                "keep_seconds": 60.0
             }
         }
     }
     """
-    # Extract input data
     job_input = job.get("input", {})
     webhook_url = None
     job_id = None
-    
-    # Keep track of temporary files for cleanup
-    temp_files = []
+    temp_files = []  # Track temp files for cleanup
 
     try:
         # ---------------------------------------------------------------------
@@ -539,6 +602,7 @@ def process_video(job):
             raise ValueError("Missing 'video_url' in input payload")
 
         options = job_input.get('options', {})
+        whisper_model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
         
         logger.info("=" * 60)
         logger.info(f"🚀 Starting video processing for Job ID: {job_id}")
@@ -554,7 +618,6 @@ def process_video(job):
         # ---------------------------------------------------------------------
         # STEP 2: Transcribe the video
         # ---------------------------------------------------------------------
-        whisper_model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
         transcription = processor.transcribe_video(
             video_path,
             language=options.get('language', 'auto'),
@@ -562,7 +625,7 @@ def process_video(job):
         )
         
         # ---------------------------------------------------------------------
-        # STEP 3: Get LLM summarization (title, summary, initial timestamps)
+        # STEP 3: Get LLM summarization
         # ---------------------------------------------------------------------
         hook_title, summarized_segments, llm_timestamps = processor.get_summarization_from_video(video_path)
         
@@ -570,73 +633,95 @@ def process_video(job):
             raise RuntimeError("Failed to generate timestamps from LLM summarization.")
         
         # ---------------------------------------------------------------------
-        # STEP 4: Extract highlights (LLM-only or EchoFusion)
+        # STEP 4: Extract highlights
         # ---------------------------------------------------------------------
         method = options.get('method', 'echofusion')
         logger.info(f"Using highlight extraction method: {method}")
 
         if method == 'llm_only':
-            logger.info("💬 Using timestamps directly from LLM summarization...")
+            logger.info("💬 Using timestamps directly from LLM...")
             highlights = [{"start": start, "end": end} for start, end in llm_timestamps]
         else:
-            # Use the more advanced EchoFusion method
             highlights = processor.extract_highlights_echofusion(
                 video_path, llm_timestamps, summarized_segments, options
             )
 
         # ---------------------------------------------------------------------
-        # STEP 5: Create the summary video (cut and concatenate highlights)
+        # STEP 5: Create summary video
         # ---------------------------------------------------------------------
         summary_video_path = Path(tempfile.mkstemp(suffix=".mp4")[1])
         temp_files.append(summary_video_path)
         processor.create_summary_video(video_path, highlights, summary_video_path)
         
-        # This will be the "current" video that we apply transformations to
         current_video_path = summary_video_path
 
         # ---------------------------------------------------------------------
-        # STEP 6: Add subtitles if requested
+        # STEP 6: Add karaoke subtitles if enabled
         # ---------------------------------------------------------------------
-        if options.get('subtitle', False) and summarized_segments:
-            logger.info("📝 Subtitle option enabled - adding subtitles...")
+        subtitles_applied = False
+        if options.get('subtitles', False):
+            logger.info("📝 Subtitles enabled - starting karaoke subtitle pipeline...")
             
-            subtitled_video_path = Path(tempfile.mkstemp(suffix="_subtitled.mp4")[1])
-            temp_files.append(subtitled_video_path)
+            subtitle_style = options.get('subtitle_style', 'dynamic')
+            if subtitle_style not in ['dynamic', 'casual']:
+                logger.warning(f"Invalid subtitle_style '{subtitle_style}', using 'dynamic'")
+                subtitle_style = 'dynamic'
             
-            processor.add_subtitles(
-                video_path=current_video_path,
-                summarized_segments=summarized_segments,
-                output_path=subtitled_video_path
-            )
-            
-            # Update current video to the subtitled version
-            current_video_path = subtitled_video_path
+            try:
+                # Transcribe for word-level timestamps
+                words = processor.transcribe_for_subtitles(
+                    current_video_path,
+                    model_size=whisper_model_size
+                )
+                
+                # Burn subtitles
+                subtitled_path = Path(tempfile.mkstemp(suffix="_subtitled.mp4")[1])
+                temp_files.append(subtitled_path)
+                
+                processor.burn_karaoke_subtitles(
+                    video_path=current_video_path,
+                    output_path=subtitled_path,
+                    words=words,
+                    style=subtitle_style,
+                    video_width=options.get('video_width', 1080),
+                    video_height=options.get('video_height', 1920),
+                    words_per_line=options.get('words_per_line', 3)
+                )
+                
+                current_video_path = subtitled_path
+                subtitles_applied = True
+                logger.info(f"✅ Karaoke subtitles burned with style: {subtitle_style}")
+                
+            except Exception as sub_error:
+                logger.error(f"⚠️ Subtitle burning failed: {sub_error}", exc_info=True)
+                logger.info("Continuing with video without subtitles...")
         else:
-            logger.info("📝 Subtitle option: disabled or no segments available")
+            logger.info("📝 Subtitles: disabled")
 
         # ---------------------------------------------------------------------
-        # STEP 7: Convert to vertical format if requested
+        # STEP 7: Convert to vertical if enabled
         # ---------------------------------------------------------------------
+        vertical_applied = False
         if options.get('vertical', False):
             logger.info("📱 Vertical option enabled - converting to 9:16...")
             
-            vertical_video_path = Path(tempfile.mkstemp(suffix="_vertical.mp4")[1])
-            temp_files.append(vertical_video_path)
+            vertical_path = Path(tempfile.mkstemp(suffix="_vertical.mp4")[1])
+            temp_files.append(vertical_path)
             
             crop_method = options.get('crop_method', 'center')
             processor.convert_to_vertical(
                 video_path=current_video_path,
-                output_path=vertical_video_path,
+                output_path=vertical_path,
                 crop_method=crop_method
             )
             
-            # Update current video to the vertical version
-            current_video_path = vertical_video_path
+            current_video_path = vertical_path
+            vertical_applied = True
         else:
-            logger.info("📱 Vertical option: disabled")
+            logger.info("📱 Vertical conversion: disabled")
 
         # ---------------------------------------------------------------------
-        # STEP 8: Upload the final video to Supabase
+        # STEP 8: Upload to Supabase
         # ---------------------------------------------------------------------
         result_url = processor.upload_to_supabase(
             current_video_path,
@@ -645,7 +730,7 @@ def process_video(job):
         )
         
         # ---------------------------------------------------------------------
-        # STEP 9: Send success webhook to backend
+        # STEP 9: Send success webhook
         # ---------------------------------------------------------------------
         if webhook_url:
             logger.info(f"📤 Sending success webhook to {webhook_url}")
@@ -658,17 +743,19 @@ def process_video(job):
                 "hook_title": hook_title,
                 "options_applied": {
                     "method": method,
-                    "subtitle": options.get('subtitle', False),
-                    "vertical": options.get('vertical', False)
+                    "subtitles": subtitles_applied,
+                    "subtitle_style": options.get('subtitle_style', 'dynamic') if subtitles_applied else None,
+                    "vertical": vertical_applied,
+                    "crop_method": options.get('crop_method', 'center') if vertical_applied else None
                 }
             })
         
         # ---------------------------------------------------------------------
-        # CLEANUP: Remove temporary files
+        # CLEANUP
         # ---------------------------------------------------------------------
         for temp_file in temp_files:
             try:
-                if temp_file.exists():
+                if isinstance(temp_file, Path) and temp_file.exists():
                     temp_file.unlink()
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {temp_file}: {e}")
@@ -681,13 +768,13 @@ def process_video(job):
             "status": "success",
             "job_id": job_id,
             "result_url": result_url,
-            "transcription": transcription[:5],  # Return first 5 segments as preview
+            "transcription": transcription[:5],  # First 5 segments as preview
             "highlights_count": len(highlights),
             "hook_title": hook_title,
             "options_applied": {
                 "method": method,
-                "subtitle": options.get('subtitle', False),
-                "vertical": options.get('vertical', False)
+                "subtitles": subtitles_applied,
+                "vertical": vertical_applied
             }
         }
         
@@ -727,7 +814,7 @@ def process_thumbnail(job):
     """
     Generate a thumbnail from a video.
     
-    Input format:
+    Input:
     {
         "input": {
             "job_id": "abc123",
@@ -815,11 +902,21 @@ def handler(job):
     """
     Main entry point for RunPod.
     
-    This function routes the job to the appropriate processor based on the 'task' field.
+    Routes jobs to the appropriate processor based on the 'task' field.
     
     Supported tasks:
     - "process_video": Full video processing pipeline
     - "generate_thumbnail": Generate thumbnail from video
+    
+    Example input:
+    {
+        "input": {
+            "task": "process_video",
+            "job_id": "abc123",
+            "video_url": "https://...",
+            ...
+        }
+    }
     """
     job_input = job.get("input", {})
     task = job_input.get("task", "process_video")
@@ -833,7 +930,7 @@ def handler(job):
     else:
         return {
             "status": "error",
-            "error": f"Unknown task: {task}. Supported tasks: process_video, generate_thumbnail"
+            "error": f"Unknown task: {task}. Supported: process_video, generate_thumbnail"
         }
 
 
@@ -843,7 +940,7 @@ def handler(job):
 if __name__ == "__main__":
     if runpod:
         logger.info("🚀 Starting RunPod serverless handler...")
+        logger.info(f"Model cache directory: {MODEL_DIR}")
         runpod.serverless.start({"handler": handler})
     else:
         logger.info("Running in local test mode (RunPod not available)")
-        

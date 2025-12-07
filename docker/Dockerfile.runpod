@@ -62,6 +62,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libswresample3 \
     wget \
     curl \
+    fonts-noto-cjk \
+    fonts-noto-cjk-extra \
     && rm -rf /var/lib/apt/lists/*
 
 # Create python3 symlink (IMPORTANT!)
