@@ -74,7 +74,7 @@ class SubtitleStyleConfig:
 # Pre-defined style configurations
 STYLE_CONFIGS: Dict[SubtitleStyleType, SubtitleStyleConfig] = {
     SubtitleStyleType.SIMPLE1: SubtitleStyleConfig(
-        font_name="Arial",
+        font_name="Noto Sans CJK KR",
         font_size=52,
         bold=True,
         primary_color="&H00FFFFFF&",        # White
@@ -88,7 +88,7 @@ STYLE_CONFIGS: Dict[SubtitleStyleType, SubtitleStyleConfig] = {
     ),
     
     SubtitleStyleType.SIMPLE2: SubtitleStyleConfig(
-        font_name="Arial",
+        font_name="Noto Sans CJK KR",
         font_size=48,
         bold=True,
         primary_color="&H00000000&",        # Black text
@@ -102,7 +102,7 @@ STYLE_CONFIGS: Dict[SubtitleStyleType, SubtitleStyleConfig] = {
     ),
     
     SubtitleStyleType.SIMPLE3: SubtitleStyleConfig(
-        font_name="Arial",
+        font_name="Noto Sans CJK KR",
         font_size=48,
         bold=True,
         primary_color="&H00FFFFFF&",        # White text
@@ -130,7 +130,7 @@ STYLE_CONFIGS: Dict[SubtitleStyleType, SubtitleStyleConfig] = {
     ),
     
     SubtitleStyleType.DYNAMIC: SubtitleStyleConfig(
-        font_name="Impact",                  # Bold, impactful font
+        font_name="Noto Sans CJK KR",                  # Bold, impactful font
         font_size=56,
         bold=True,
         primary_color="&H00FFFFFF&",        # White
