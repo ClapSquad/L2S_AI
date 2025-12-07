@@ -16,8 +16,7 @@ import uuid
 from src.core.summarization.video_to_summarization import video_to_summarization
 from src.core.video_processing.video_processor import cut_video_by_timestamps
 from src.core.video_processing.video_exporter import export_social_media_vertical_video
-from src.core.subtitles.subtitles import burn_subtitles, remap_subtitles
-
+from src.core.subtitles.subtitle_burner import burn_subtitles_complete_pipeline
 
 from utils.logging_initialization import initialize_logging
 
@@ -37,7 +36,13 @@ def main():
     parser.add_argument("-v", "--vertical_export", action="store_true",
                         help="Exports a vertical (9:16) video optimized for social media.")
     parser.add_argument("-s", "--subtitles", action="store_true",
-                        help="Burn caption into videos")
+                        help="Burn karaoke-style captions into videos.")
+    parser.add_argument("--subtitle_style", type=str, default="dynamic",
+                        choices=["simple1", "simple2", "simple3", "casual", "dynamic"],
+                        help="Subtitle style for burning.")
+    parser.add_argument("--whisper_model", type=str, default="base",
+                        help="Whisper model for transcription (e.g., tiny, base, small).")
+
 
     # Highlight detection + LLM pipeline args
     parser.add_argument("--method", choices=["llm", "echofusion"], default="llm",
@@ -52,7 +57,7 @@ def main():
 
     video_path = args.file
     base_filename = os.path.splitext(os.path.basename(video_path))[0]
-    output_dir = os.path.join("../assets", f"{base_filename}_{uuid.uuid4().hex[:6]}")
+    output_dir = os.path.join("assets", f"{base_filename}_{uuid.uuid4().hex[:6]}")
     os.makedirs(output_dir, exist_ok=True)
 
     # --- Summarization / Highlight detection ---
@@ -104,16 +109,22 @@ def main():
 
     # --- Optional subtitle burn ---
     if args.subtitles:
-        print("\n--- Burning Subtitles ---")
-        remapped = remap_subtitles(summarized_segments)
-        logging.debug(f"Remapped result => {remapped}")
-        out_video = burn_subtitles(
-            f"{hook_title}_reel.mp4" if args.vertical_export else f"{hook_title}_summary.mp4",
-            remapped,
-            output_dir,
-            output_dir
-        )
-        logging.debug(f"Subtitled video generated at {out_video}")
+        print("\n--- Burning Karaoke-Style Subtitles ---")
+        video_to_subtitle = vertical_export_path if args.vertical_export else summarized_video_path
+        subtitled_output_path = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(video_to_subtitle))[0]}_subtitled.mp4")
+
+        try:
+            burn_subtitles_complete_pipeline(
+                video_path=video_to_subtitle,
+                output_path=subtitled_output_path,
+                style=args.subtitle_style,
+                whisper_model=args.whisper_model,
+                # Assuming vertical video dimensions if that option is chosen
+                video_width=1080 if args.vertical_export else 1920, # Default to horizontal if not vertical
+                video_height=1920 if args.vertical_export else 1080
+            )
+        except Exception as e:
+            logging.error(f"Failed to burn subtitles: {e}")
 
     print(f"\nAll done! Check output folder: {output_dir}")
 
