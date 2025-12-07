@@ -41,8 +41,8 @@ RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cu121
 
 # Copy requirements and install all Python packages
-COPY . .
-RUN pip install --no-cache-dir -r requirements/requirements_runpod.txt
+COPY requirements/requirements_runpod.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # ============ STAGE 2: RUNTIME ============
 FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
