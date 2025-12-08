@@ -1,5 +1,7 @@
 from src.core.video_processing.video_to_audio import convert_video_to_audio
 from src.core.audio_processing.audio_to_text import transcribe_audio
+from src.core.summarization.boundary_alignment import align_timestamps_to_sentences
+from src.core.summarization.coherence_validation import iterative_coherence_improvement
 from .llm_client import call_gemini
 import logging, shutil, os, json
 from typing import List, Tuple
@@ -27,32 +29,47 @@ def video_to_summarization(VIDEO_PATH):
         logging.info(f"Transcribed {len(transcribed_segments)} segments, total duration: {transcribed_segments[-1][1][1]:.2f}s")
 
         prompt = f"""
-            You are a video summarization assistant.
+            You are a video summarization assistant focused on creating COHERENT, concise highlights.
 
             Goal:
-            Select the most important segments from the transcript to make a concise highlight summary whose
-            TOTAL duration ≤ 60.0 seconds. Prefer segments that are self-contained and informative.
+            Select the most important segments from the transcript to make a narratively coherent highlight summary whose
+            TOTAL duration ≤ 60.0 seconds. Each segment must be SEMANTICALLY COMPLETE and self-contained.
 
             Inputs:
             - "Transcribed Segments" is a Python-like list of tuples: (text, (start_time, end_time)).
             - Times are in seconds (float).
+
+            ⚠️ CRITICAL RULES FOR COHERENCE:
+            1) NEVER cut in the middle of a sentence or thought.
+            2) Each segment must START at the beginning of a sentence.
+            3) Each segment must END at a natural pause (period, question mark, or clear thought completion).
+            4) If a speaker says "Let me explain X" - include the explanation, not just the intro.
+            5) Avoid segments that start with "and", "but", "so", "because" (mid-thought indicators).
+            6) Avoid segments that end with incomplete phrases like "which means...", "so that...", "because of...".
+            7) If an important point starts in one segment but completes in the next, MERGE them into a single timestamp range.
 
             Hard rules:
             1) Output valid JSON only (no prose), matching this schema:
             {{
                 "timestamps": [ [start, end], ... ]    // non-overlapping, sorted by start ASC
             }}
-            2) Each [start, end] must satisfy: 0 ≤ start < end, and (end - start) ≥ 2.0 seconds.
-            3) Merge or skip highly overlapping or adjacent (< 0.75s gap) segments to keep context.
+            2) Each [start, end] must satisfy: 0 ≤ start < end, and (end - start) ≥ 3.0 seconds.
+            3) Merge adjacent segments (< 1.5s gap) to maintain context and flow.
             4) Ensure TOTAL duration (sum over all segments) ≤ 60.0 seconds.
-            5) Do NOT invent timestamps that are not present in input; you may extend to merge adjacent by up to 0.75s.
+            5) Do NOT invent timestamps that are not present in input; you may extend start/end times slightly to merge adjacent segments.
             6) Keep language as-is (don’t translate text).
             7) If no meaningful segments exist, return {{ "timestamps": [] }}.
 
-            Tie-breaking (if needed):
-            - Prefer segments with concrete facts, steps, or outcomes.
-            - Prefer segments that do not require external context.
-            - Prefer segments that include key conclusions or demonstrations.
+            Selection Priority (in order):
+            1. Segments that are complete, standalone thoughts.
+            2. Segments with concrete facts, steps, conclusions, or outcomes.
+            3. Segments that introduce AND explain a concept (not just introduce).
+            4. Segments with concrete examples or demonstrations.
+
+            AVOID:
+            - Segments that are questions without answers.
+            - Introductory phrases without the content they introduce.
+            - Conclusions without the reasoning that led to them.
 
             Output examples:
             OK → {{ "timestamps": [[0.50, 7.80], [12.00, 24.10], [45.00, 58.70]] }}
@@ -80,8 +97,16 @@ def video_to_summarization(VIDEO_PATH):
                 "  3. The video content may be too repetitive or low-quality\n"
                 f"  Transcription preview: {str(transcribed_segments[:3])[:200]}..."
             )
+        
+        # Align timestamps to sentence boundaries
+        print("-> Aligning timestamps to sentence boundaries ...")
+        timestamps = align_timestamps_to_sentences(timestamps, transcribed_segments)
+        logging.info(f"Adjusted timestamps for sentence alignment: {timestamps}")
 
-        logging.info(f"Parsed {len(timestamps)} timestamp ranges for cutting: {timestamps}")
+        # Iteratively improve coherence
+        print("-> Validating and improving narrative coherence...")
+        timestamps = iterative_coherence_improvement(timestamps, transcribed_segments)
+        logging.info(f"Final timestamps after coherence validation: {timestamps}")
 
         # Extract text for the summarized segments
         summarized_text = " ".join(
