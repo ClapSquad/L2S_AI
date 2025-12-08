@@ -90,46 +90,6 @@ class VideoProcessor:
         logger.warning("No config file found. Using defaults.")
         self.config = {}
 
-    def _load_clip(self):
-        """Lazy-load CLIP model (only when needed for EchoFusion)"""
-        if self.clip_model is None:
-            import open_clip
-            import torch
-            
-            cache_dir = MODEL_DIR / "clip"
-            cache_dir.mkdir(exist_ok=True)
-            
-            self.clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms(
-                "ViT-B-32",
-                pretrained="openai",
-                cache_dir=str(cache_dir)
-            )
-            
-            if torch.cuda.is_available():
-                self.clip_model = self.clip_model.cuda()
-            
-            logger.info(f"CLIP model loaded on {self.device}")
-        return self.clip_model, self.clip_preprocess
-
-    def load_whisper(self, model_size="medium"):
-        """Load Whisper model (cached in network volume)"""
-        if self.whisper_model is not None:
-            return self.whisper_model
-            
-        logger.info(f"Loading Whisper {model_size}...")
-        from faster_whisper import WhisperModel
-        
-        compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "float16")
-        self.whisper_model = WhisperModel(
-            model_size,
-            device=self.device,
-            compute_type=compute_type,
-            download_root=str(MODEL_DIR)
-        )
-        
-        logger.info("Whisper loaded!")
-        return self.whisper_model
-
     # =========================================================================
     # STEP 1: Download Video
     # =========================================================================
@@ -163,7 +123,7 @@ class VideoProcessor:
     # =========================================================================
     # STEP 2: Transcribe Video
     # =========================================================================
-    def transcribe_video(self, video_path: Path, language: str = "auto", model_size: str = "base") -> list:
+    def transcribe_video(self, video_path: Path, language: str = "auto", model_size: str = "small") -> list:
         """
         Convert video audio to text using Whisper AI.
         
