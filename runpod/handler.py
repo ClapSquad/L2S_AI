@@ -90,46 +90,6 @@ class VideoProcessor:
         logger.warning("No config file found. Using defaults.")
         self.config = {}
 
-    def _load_clip(self):
-        """Lazy-load CLIP model (only when needed for EchoFusion)"""
-        if self.clip_model is None:
-            import open_clip
-            import torch
-            
-            cache_dir = MODEL_DIR / "clip"
-            cache_dir.mkdir(exist_ok=True)
-            
-            self.clip_model, _, self.clip_preprocess = open_clip.create_model_and_transforms(
-                "ViT-B-32",
-                pretrained="openai",
-                cache_dir=str(cache_dir)
-            )
-            
-            if torch.cuda.is_available():
-                self.clip_model = self.clip_model.cuda()
-            
-            logger.info(f"CLIP model loaded on {self.device}")
-        return self.clip_model, self.clip_preprocess
-
-    def load_whisper(self, model_size="medium"):
-        """Load Whisper model (cached in network volume)"""
-        if self.whisper_model is not None:
-            return self.whisper_model
-            
-        logger.info(f"Loading Whisper {model_size}...")
-        from faster_whisper import WhisperModel
-        
-        compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "float16")
-        self.whisper_model = WhisperModel(
-            model_size,
-            device=self.device,
-            compute_type=compute_type,
-            download_root=str(MODEL_DIR)
-        )
-        
-        logger.info("Whisper loaded!")
-        return self.whisper_model
-
     # =========================================================================
     # STEP 1: Download Video
     # =========================================================================
@@ -163,7 +123,7 @@ class VideoProcessor:
     # =========================================================================
     # STEP 2: Transcribe Video
     # =========================================================================
-    def transcribe_video(self, video_path: Path, language: str = "auto", model_size: str = "base") -> list:
+    def transcribe_video(self, video_path: Path, language: str = "auto", model_size: str = "small") -> list:
         """
         Convert video audio to text using Whisper AI.
         
@@ -354,7 +314,40 @@ class VideoProcessor:
         return output_path
 
     # =========================================================================
-    # STEP 6: Add Karaoke Subtitles
+    # STEP 6: Convert to Vertical Format
+    # =========================================================================
+    def convert_to_vertical(self, video_path: Path, output_path: Path, 
+                            crop_method: str = "center") -> Path:
+        """
+        Convert a horizontal (16:9) video to vertical (9:16) for Shorts/Reels/TikTok.
+        
+        Args:
+            video_path: Input video (usually 16:9 horizontal)
+            output_path: Where to save the vertical video
+            crop_method: 
+                - "center": Crops the center portion (loses sides)
+                - "blur": Keeps full video in center with blurred background
+            
+        Returns:
+            Path: Path to the vertical video
+        """
+        logger.info(f"📱 Converting to vertical (9:16) using '{crop_method}' method...")
+        
+        from src.core.video_processing.video_exporter import export_social_media_vertical_video
+        
+        export_social_media_vertical_video(
+            input_path=str(video_path),
+            output_path=str(output_path),
+            resolution="1080x1920",
+            bitrate="15M",
+            crop_method=crop_method
+        )
+        
+        logger.info(f"✅ Vertical video created: {output_path}")
+        return output_path
+
+    # =========================================================================
+    # STEP 7: Add Karaoke Subtitles
     # =========================================================================
     def burn_karaoke_subtitles(
         self,
@@ -409,38 +402,7 @@ class VideoProcessor:
         logger.info(f"✅ Subtitles burned: {result}")
         return Path(result)
 
-    # =========================================================================
-    # STEP 7: Convert to Vertical Format
-    # =========================================================================
-    def convert_to_vertical(self, video_path: Path, output_path: Path, 
-                            crop_method: str = "center") -> Path:
-        """
-        Convert a horizontal (16:9) video to vertical (9:16) for Shorts/Reels/TikTok.
-        
-        Args:
-            video_path: Input video (usually 16:9 horizontal)
-            output_path: Where to save the vertical video
-            crop_method: 
-                - "center": Crops the center portion (loses sides)
-                - "blur": Keeps full video in center with blurred background
-            
-        Returns:
-            Path: Path to the vertical video
-        """
-        logger.info(f"📱 Converting to vertical (9:16) using '{crop_method}' method...")
-        
-        from src.core.video_processing.video_exporter import export_social_media_vertical_video
-        
-        export_social_media_vertical_video(
-            input_path=str(video_path),
-            output_path=str(output_path),
-            resolution="1080x1920",
-            bitrate="15M",
-            crop_method=crop_method
-        )
-        
-        logger.info(f"✅ Vertical video created: {output_path}")
-        return output_path
+
 
     # =========================================================================
     # STEP 8: Upload to Supabase Storage
@@ -656,7 +618,29 @@ def process_video(job):
         current_video_path = summary_video_path
 
         # ---------------------------------------------------------------------
-        # STEP 6: Add karaoke subtitles if enabled
+        # STEP 6: Convert to vertical if enabled
+        # ---------------------------------------------------------------------
+        vertical_applied = False
+        if options.get('vertical', False):
+            logger.info("📱 Vertical option enabled - converting to 9:16...")
+            
+            vertical_path = Path(tempfile.mkstemp(suffix="_vertical.mp4")[1])
+            temp_files.append(vertical_path)
+            
+            crop_method = options.get('crop_method', 'center')
+            processor.convert_to_vertical(
+                video_path=current_video_path,
+                output_path=vertical_path,
+                crop_method=crop_method
+            )
+            
+            current_video_path = vertical_path
+            vertical_applied = True
+        else:
+            logger.info("📱 Vertical conversion: disabled")
+
+        # ---------------------------------------------------------------------
+        # STEP 7: Add karaoke subtitles if enabled
         # ---------------------------------------------------------------------
         subtitles_applied = False
         if options.get('subtitles', False):
@@ -697,28 +681,6 @@ def process_video(job):
                 logger.info("Continuing with video without subtitles...")
         else:
             logger.info("📝 Subtitles: disabled")
-
-        # ---------------------------------------------------------------------
-        # STEP 7: Convert to vertical if enabled
-        # ---------------------------------------------------------------------
-        vertical_applied = False
-        if options.get('vertical', False):
-            logger.info("📱 Vertical option enabled - converting to 9:16...")
-            
-            vertical_path = Path(tempfile.mkstemp(suffix="_vertical.mp4")[1])
-            temp_files.append(vertical_path)
-            
-            crop_method = options.get('crop_method', 'center')
-            processor.convert_to_vertical(
-                video_path=current_video_path,
-                output_path=vertical_path,
-                crop_method=crop_method
-            )
-            
-            current_video_path = vertical_path
-            vertical_applied = True
-        else:
-            logger.info("📱 Vertical conversion: disabled")
 
         # ---------------------------------------------------------------------
         # STEP 8: Upload to Supabase
